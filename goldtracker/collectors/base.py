@@ -25,6 +25,8 @@ class RawListing:
     # Collectors may override the parser when the retailer gives structured values
     weight_g: float | None = None
     purity: float | None = None
+    # When the price was seen (ISO 8601). None = now. Lets you backfill past prices.
+    seen_at: str | None = None
 
 
 def save_listings(conn: sqlite3.Connection, listings: list[RawListing]) -> dict:
@@ -44,7 +46,8 @@ def save_listings(conn: sqlite3.Connection, listings: list[RawListing]) -> dict:
             brand=item.brand, url=item.url, weight_g=weight, purity=purity, form=parsed.form,
         )
         db.add_price(conn, pid, list_price=item.price, mrp=item.mrp, coupon_code=item.coupon_code,
-                     coupon_value=item.coupon_value, in_stock=item.in_stock, stock_left=item.stock_left)
+                     coupon_value=item.coupon_value, in_stock=item.in_stock, stock_left=item.stock_left,
+                     seen_at=item.seen_at)
         saved += 1
     conn.commit()
     return {"saved": saved, "skipped_non_bullion": skipped, "unparsed": unparsed}
