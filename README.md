@@ -21,7 +21,8 @@ cp .env.example .env               # then edit .env
 ```bash
 python -m goldtracker init                          # create the SQLite database (data/gold.db)
 python -m goldtracker rate --set 14787              # today's 24K rate, ₹/g excl. GST
-python -m goldtracker import-csv data/sample_listings.csv   # sample data to try it out
+python -m goldtracker import-csv data/sample_history.csv    # sample past prices (for the history chart)
+python -m goldtracker import-csv data/sample_listings.csv   # sample current prices
 python -m goldtracker rank                          # top deals in the terminal
 python -m goldtracker serve                         # dashboard at http://127.0.0.1:8000
 ```
@@ -35,8 +36,21 @@ python -m goldtracker schedule                      # refresh every REFRESH_MINU
 ```
 
 You can add any deal by hand to a CSV with the columns
-`retailer, sku, title, price, brand, url, mrp, coupon_code, coupon_value, in_stock, stock_left`
+`retailer, sku, title, price, brand, url, mrp, coupon_code, coupon_value, in_stock, stock_left, seen_at`
 and import it with `import-csv`.
+
+## Dashboard
+
+- **Best value by weight:** the cheapest deal per weight, with the best overall highlighted. Click a card to filter.
+- **Filters:** retailer, brand, purity, form, quick weight chips, and "only listings with a coupon".
+- **Pay with:** tick the cards, cashback and coupons you can use, or enter the discount on Amazon Pay balance you bought. Prices re-rank instantly.
+- **Vs market** in ₹ per fine gram and %, plus a **price breakdown** per row (coupon, card, fee, cashback).
+- **Price history:** every crawl stores a price, so rows show a ▼/▲ change badge, "30-day low", and a 30-day price chart in the breakdown.
+- **Shareable views:** filters and offers live in the URL; "Copy link to this view" copies it.
+
+## Price history
+
+History builds itself: each `collect` or scheduled refresh adds one price row per product. To backfill older prices, import a CSV with a `seen_at` column (`2026-10-01` or `2026-10-01T09:30`, read as India time), e.g. `python -m goldtracker import-csv data/sample_history.csv`. The API serves it at `/api/history/{product_id}`.
 
 ## How the math works
 
