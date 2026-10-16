@@ -1,0 +1,43 @@
+[
+  {
+    "id": "sbi-card",
+    "kind": "card",
+    "retailer": "amazon",
+    "label": "SBI Credit/Debit Card",
+    "percent": 10,
+    "max_cap": 1250,
+    "fee": 99,
+    "tiers": [
+      {"flat": 500, "min_spend": 24990},
+      {"flat": 1500, "min_spend": 34990},
+      {"flat": 2500, "min_spend": 49990}
+    ],
+    "valid_until": "2026-10-31",
+    "note": "Example from the Great Indian Festival sale as seen on 2026-10-16. Extra-slab thresholds are estimates; check the offer page."
+  },
+  {
+    "id": "icici-amazon-pay",
+    "kind": "card",
+    "retailer": "amazon",
+    "label": "ICICI Amazon Pay Credit Card",
+    "percent": 5
+  },
+  {
+    "id": "cb-1350-29k",
+    "kind": "cashback",
+    "retailer": "amazon",
+    "label": "₹1,350 cashback on ₹29,000+",
+    "flat": 1350,
+    "min_spend": 29000
+  },
+  {
+    "id": "myntra-first-order",
+    "kind": "coupon",
+    "retailer": "myntra",
+    "label": "Myntra first-order coupon (example)",
+    "flat": 200,
+    "min_spend": 999,
+    "first_order_only": true,
+    "note": "Placeholder: replace with a real coupon you have."
+  }
+]
