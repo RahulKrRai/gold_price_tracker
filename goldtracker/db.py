@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator
 
@@ -138,6 +138,44 @@ def save_rate(conn: sqlite3.Connection, rate_24k: float, source: str, rate_22k: 
 
 def latest_rate(conn: sqlite3.Connection) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM gold_rates ORDER BY fetched_at DESC, id DESC LIMIT 1").fetchone()
+
+
+def price_stats(conn: sqlite3.Connection, days: int = 30) -> dict[int, dict]:
+    """Per product: lowest list price in the last `days`, and the previous different price."""
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+    stats: dict[int, dict] = {}
+    for r in conn.execute(
+        "SELECT product_id, MIN(list_price) AS low, COUNT(*) AS n FROM prices WHERE seen_at >= ? GROUP BY product_id",
+        (since,),
+    ):
+        stats[r["product_id"]] = {"low_30d": r["low"], "samples_30d": r["n"], "prev_price": None}
+    # previous price = most recent row whose price differs from the latest one
+    for r in conn.execute(
+        """
+        WITH ranked AS (
+            SELECT product_id, list_price, seen_at,
+                   ROW_NUMBER() OVER (PARTITION BY product_id ORDER BY seen_at DESC, id DESC) AS rn
+            FROM prices
+        ), latest AS (SELECT product_id, list_price FROM ranked WHERE rn = 1)
+        SELECT r.product_id, r.list_price
+        FROM ranked r JOIN latest l ON l.product_id = r.product_id
+        WHERE r.rn > 1 AND r.list_price != l.list_price
+          AND r.rn = (SELECT MIN(r2.rn) FROM ranked r2
+                      WHERE r2.product_id = r.product_id AND r2.rn > 1 AND r2.list_price != l.list_price)
+        """
+    ):
+        stats.setdefault(r["product_id"], {"low_30d": None, "samples_30d": 0, "prev_price": None})
+        stats[r["product_id"]]["prev_price"] = r["list_price"]
+    return stats
+
+
+def price_history(conn: sqlite3.Connection, product_id: int, days: int = 30) -> list[dict]:
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+    rows = conn.execute(
+        "SELECT seen_at, list_price, in_stock FROM prices WHERE product_id = ? AND seen_at >= ? ORDER BY seen_at",
+        (product_id, since),
+    ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def latest_listings(conn: sqlite3.Connection) -> list[sqlite3.Row]:

@@ -30,6 +30,12 @@ class RankedDeal:
     per_g_actual: float
     premium_vs_spot: float | None          # vs 24K rate excl. GST
     premium_vs_spot_gst: float | None      # vs 24K rate + 3% GST (the price you can't avoid)
+    premium_inr: float | None = None       # INR per fine gram above (+) or below (-) spot
+    has_coupon: bool = False
+    low_30d: float | None = None           # lowest list price seen in 30 days
+    prev_price: float | None = None        # previous different list price
+    price_change: float | None = None      # latest list price - previous price
+    at_30d_low: bool = False
 
     def as_dict(self) -> dict:
         return self.__dict__.copy()
@@ -46,9 +52,11 @@ def spot_per_fine_gram(rate_24k: float) -> float:
 
 def rank(conn: sqlite3.Connection, offers: list[Offer], *, held: set[str] | None = None,
          include_first_order: bool = False, retailer: str | None = None, weight_g: float | None = None,
-         purity: float | None = None, form: str | None = None, in_stock_only: bool = True) -> list[RankedDeal]:
+         purity: float | None = None, form: str | None = None, in_stock_only: bool = True,
+         brand: str | None = None, coupon_only: bool = False) -> list[RankedDeal]:
     rate_row = db.latest_rate(conn)
     spot = spot_per_fine_gram(rate_row["rate_24k"]) if rate_row else None
+    stats = db.price_stats(conn)
     deals: list[RankedDeal] = []
     for r in db.latest_listings(conn):
         if r["weight_g"] is None or r["purity"] is None:
@@ -63,6 +71,10 @@ def rank(conn: sqlite3.Connection, offers: list[Offer], *, held: set[str] | None
             continue
         if in_stock_only and not r["in_stock"]:
             continue
+        if brand and (r["brand"] or "").lower() != brand.lower():
+            continue
+        if coupon_only and not r["coupon_value"]:
+            continue
         coupon = (r["coupon_code"] or "listing coupon", r["coupon_value"]) if r["coupon_value"] else None
         b = apply_offers(r["list_price"], r["retailer"], offers, held=held,
                          include_first_order=include_first_order, listing_coupon=coupon)
@@ -75,7 +87,18 @@ def rank(conn: sqlite3.Connection, offers: list[Offer], *, held: set[str] | None
             per_fine_g=round(pfg, 2), per_g_actual=round(b.effective_price / r["weight_g"], 2),
             premium_vs_spot=round(pfg / spot - 1, 4) if spot else None,
             premium_vs_spot_gst=round(pfg / (spot * (1 + GST)) - 1, 4) if spot else None,
+            premium_inr=round(pfg - spot, 2) if spot else None,
+            has_coupon=bool(r["coupon_value"]),
         ))
+        s = stats.get(r["id"])
+        if s:
+            d = deals[-1]
+            d.low_30d, d.prev_price = s["low_30d"], s["prev_price"]
+            if s["prev_price"] is not None:
+                d.price_change = round(r["list_price"] - s["prev_price"], 2)
+            # Only a "low" if the price has actually moved; a flat price isn't news
+            d.at_30d_low = (s["prev_price"] is not None and s["low_30d"] is not None
+                            and r["list_price"] <= s["low_30d"])
     deals.sort(key=lambda d: d.per_fine_g)
     return deals
 
