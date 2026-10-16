@@ -1,8 +1,13 @@
 """Myntra collector for gold coins and bars.
 
-STATUS: written but NOT yet tested against the live site (it couldn't be run from the build
-environment). Run it locally with `python -m goldtracker collect myntra --dry-run` and check the
-output before trusting it. Myntra's page structure can change at any time.
+STATUS (2026-10-16): the data source was checked in a real browser. Myntra's listing pages embed
+window.__myx.searchData.results with `products` (productId, productName, brand, price, mrp,
+landingPageUrl, inventoryInfo[].available/inventory, couponData.couponDiscount,
+couponData.couponDescription.couponCode, articleType.typeName), 50 per page, `?p=N` for more,
+`hasNextPage` on the last. /gold-coin and /gold-bar overlap heavily, and /gold-bar also returns
+gold-plated necklaces (filtered out by articleType and the title parser). A snapshot of that run is in
+data/myntra_2026-10-16.csv. Myntra refuses connections from cloud/datacenter networks, so run this on
+your own computer: `python -m goldtracker collect myntra --dry-run`. The structure can change any time.
 
 How it works:
   * Opens each search page in a real browser (Playwright), one page at a time, with a pause
@@ -38,9 +43,15 @@ _STATE_JS = """
     mrp: p.mrp ?? null,
     url: p.landingPageUrl ? 'https://www.myntra.com/' + p.landingPageUrl : null,
     inStock: p.inventoryInfo ? p.inventoryInfo.some(i => i.available) : true,
+    stockLeft: p.inventoryInfo ? p.inventoryInfo.reduce((n, i) => n + (i.available ? (i.inventory || 0) : 0), 0) : null,
+    couponCode: (p.couponData && p.couponData.couponDescription && p.couponData.couponDescription.couponCode) || null,
+    couponValue: (p.couponData && p.couponData.couponDiscount) || null,
+    type: p.articleType ? p.articleType.typeName : null,
   }));
 }
 """
+
+LOW_STOCK = 10  # Myntra shows "N left" only when stock is low; we keep the count only below this
 
 _CARDS_JS = """
 () => Array.from(document.querySelectorAll('li.product-base')).map(li => {
@@ -72,10 +83,15 @@ def _to_listing(p: dict) -> RawListing | None:
     price = _money(p.get("price"))
     if not price or not p.get("title"):
         return None
+    if p.get("type") and p["type"].lower() not in {"gold coin", "gold bar", "gold coins", "gold bars"}:
+        return None  # skip silver, jewellery etc. that sneak into the listing
     sku = p.get("id") or p.get("url") or p["title"]
+    left = p.get("stockLeft")
     return RawListing(
         retailer="myntra", retailer_sku=str(sku), title=p["title"], price=price,
         brand=p.get("brand"), url=p.get("url"), mrp=_money(p.get("mrp")), in_stock=bool(p.get("inStock", True)),
+        stock_left=int(left) if left and left < LOW_STOCK else None,
+        coupon_code=p.get("couponCode"), coupon_value=_money(p.get("couponValue")),
     )
 
 
