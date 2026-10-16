@@ -26,14 +26,13 @@ def meta() -> dict:
     s = get_settings()
     with db.open_db(s.db_path) as conn:
         rate = db.latest_rate(conn)
-        retailers = [r[0] for r in conn.execute("SELECT DISTINCT retailer FROM products ORDER BY 1")]
-        weights = [r[0] for r in conn.execute(
-            "SELECT DISTINCT weight_g FROM products WHERE weight_g IS NOT NULL ORDER BY 1")]
-        purities = [r[0] for r in conn.execute(
-            "SELECT DISTINCT purity FROM products WHERE purity IS NOT NULL ORDER BY 1 DESC")]
-        forms = [r[0] for r in conn.execute("SELECT DISTINCT form FROM products ORDER BY 1")]
-        brands = [r[0] for r in conn.execute(
-            "SELECT DISTINCT brand FROM products WHERE brand IS NOT NULL ORDER BY 1 COLLATE NOCASE")]
+        # Filter options come from what can actually be ranked, so no chip leads to an empty table
+        ranked = rank(conn, [], in_stock_only=False)
+        retailers = sorted({d.retailer for d in ranked})
+        weights = sorted({d.weight_g for d in ranked})
+        purities = sorted({d.purity for d in ranked}, reverse=True)
+        forms = sorted({d.form for d in ranked if d.form})
+        brands = sorted({d.brand for d in ranked if d.brand}, key=str.lower)
         last_sync = conn.execute("SELECT MAX(seen_at) FROM prices").fetchone()[0]
     return {
         "rate": dict(rate) if rate else None,
@@ -90,9 +89,12 @@ def history(product_id: int, days: int = Query(30, ge=1, le=365)) -> dict:
 
 
 @app.get("/api/unparsed")
-def get_unparsed() -> list[dict]:
+def get_unparsed() -> dict:
+    """Listings left out of the ranking: no weight/purity in the title, or failed the sanity check."""
+    rejected: list = []
     with db.open_db(get_settings().db_path) as conn:
-        return unparsed(conn)
+        rank(conn, [], rejected=rejected, in_stock_only=False)
+        return {"unparsed": unparsed(conn), "implausible": rejected}
 
 
 @app.post("/api/refresh")
