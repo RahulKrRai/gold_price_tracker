@@ -1,0 +1,11 @@
+retailer,sku,title,price,brand,coupon_code,coupon_value,seen_at
+amazon,sample-a1,PNG Jewellers 2.5 gram Vedhani Gold Ring 24 kt (995),38450,PNG Jewellers,,,2026-09-20
+amazon,sample-a1,PNG Jewellers 2.5 gram Vedhani Gold Ring 24 kt (995),39120,PNG Jewellers,,,2026-09-27
+amazon,sample-a1,PNG Jewellers 2.5 gram Vedhani Gold Ring 24 kt (995),40480,PNG Jewellers,,,2026-10-04
+amazon,sample-a1,PNG Jewellers 2.5 gram Vedhani Gold Ring 24 kt (995),40850,PNG Jewellers,,,2026-10-11
+myntra,sample-m1,BHIMA Floral 24K 999 Purity Gold Bar 1 gram,15420,BHIMA,BFF500,500,2026-09-20
+myntra,sample-m1,BHIMA Floral 24K 999 Purity Gold Bar 1 gram,15610,BHIMA,BFF500,500,2026-09-27
+myntra,sample-m1,BHIMA Floral 24K 999 Purity Gold Bar 1 gram,15890,BHIMA,BFF500,500,2026-10-04
+myntra,sample-m1,BHIMA Floral 24K 999 Purity Gold Bar 1 gram,16240,BHIMA,BFF500,500,2026-10-11
+myntra,sample-m3,BHIMA Floral 24K 999 Purity Gold Bar 10 gram,152900,BHIMA,BFF500,500,2026-09-27
+myntra,sample-m3,BHIMA Floral 24K 999 Purity Gold Bar 10 gram,158400,BHIMA,BFF500,500,2026-10-11
