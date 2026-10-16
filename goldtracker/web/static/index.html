@@ -7,51 +7,81 @@
 <style>
   :root {
     --bg: #f7f6f2; --panel: #ffffff; --ink: #1d1b16; --muted: #6b665b; --line: #e4e0d6;
-    --gold: #a8780f; --gold-soft: #f4ead2; --good: #1f7a4d; --bad: #b3401f; --chip: #efece4;
+    --gold: #a8780f; --gold-ink: #ffffff; --gold-soft: #f4ead2; --good: #1f7a4d; --good-soft: #e3f2e9;
+    --bad: #b3401f; --chip: #efece4;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #15140f; --panel: #1e1c16; --ink: #eeeadf; --muted: #a39d8e; --line: #34312a;
-      --gold: #e0b24a; --gold-soft: #3a3020; --good: #5fc48f; --bad: #f08a6a; --chip: #2a2820;
+      --gold: #e0b24a; --gold-ink: #1d1b16; --gold-soft: #3a3020; --good: #5fc48f; --good-soft: #1d3327;
+      --bad: #f08a6a; --chip: #2a2820;
     }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink);
          font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 48px; }
-  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; justify-content: space-between; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
   h1 { margin: 0; font-size: 22px; letter-spacing: -0.01em; }
   h1 span { color: var(--gold); }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 24px 0 8px; }
   .sub { color: var(--muted); }
   .rate { background: var(--gold-soft); border-radius: 999px; padding: 6px 14px; font-weight: 600; }
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-top: 16px; }
-  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
-  select, button { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .lbl { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
+  select, input[type=number] { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
                    background: var(--panel); color: var(--ink); font: inherit; }
-  button { cursor: pointer; background: var(--gold); color: #fff; border-color: transparent; font-weight: 600; }
-  .offers { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; }
-  .offers label { display: flex; gap: 6px; align-items: center; text-transform: none; letter-spacing: 0;
-                  font-size: 13px; color: var(--ink); margin: 0; }
-  .table-wrap { overflow-x: auto; margin-top: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
-  table { width: 100%; border-collapse: collapse; min-width: 860px; }
+  button { font: inherit; cursor: pointer; }
+  .btn { width: 100%; padding: 8px 10px; border-radius: 8px; background: var(--gold); color: var(--gold-ink);
+         border: 0; font-weight: 600; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  .chipbtn { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 5px 12px; }
+  .chipbtn[aria-pressed="true"] { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); font-weight: 600; }
+  .paywith { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px 20px; margin-top: 12px;
+             padding-top: 12px; border-top: 1px solid var(--line); }
+  .paywith label { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
+  .paywith input[type=number] { width: 64px; padding: 2px 6px; display: inline-block; }
+  .hint { display: block; color: var(--muted); font-size: 12px; }
+  .strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+  .card { flex: 0 0 200px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px;
+          cursor: pointer; text-align: left; color: var(--ink); }
+  .card.top { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+  .card .w { font-weight: 700; font-size: 16px; }
+  .card .t { font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 4px 0; min-height: 32px; }
+  .card .p { font-weight: 700; }
+  .table-wrap { overflow-x: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+  table { width: 100%; border-collapse: collapse; min-width: 900px; }
   th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-  th { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; cursor: pointer;
-       user-select: none; white-space: nowrap; position: sticky; top: 0; background: var(--panel); }
+  th { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; background: var(--panel); }
+  th button { all: unset; cursor: pointer; }
   th.num, td.num { text-align: right; }
-  th[aria-sort="ascending"]::after { content: " ▲"; }
-  th[aria-sort="descending"]::after { content: " ▼"; }
-  tr:last-child td { border-bottom: 0; }
-  tr.best td { background: var(--gold-soft); }
+  th[aria-sort="ascending"] button::after { content: " ▲"; }
+  th[aria-sort="descending"] button::after { content: " ▼"; }
+  tr.best > td { background: var(--gold-soft); }
+  tr.detail > td { background: var(--bg); }
   .title a { color: var(--ink); text-decoration: none; font-weight: 600; }
   .title a:hover { text-decoration: underline; }
   .meta { color: var(--muted); font-size: 12px; }
   .chip { display: inline-block; background: var(--chip); border-radius: 6px; padding: 1px 6px; font-size: 12px; margin: 2px 4px 0 0; }
+  .badge { display: inline-block; border-radius: 6px; padding: 1px 6px; font-size: 11px; font-weight: 600; margin-top: 4px; }
+  .badge.drop { background: var(--good-soft); color: var(--good); }
+  .badge.rise { background: var(--chip); color: var(--bad); }
+  .badge.low { background: var(--gold-soft); color: var(--gold); }
   .big { font-size: 16px; font-weight: 700; }
   .good { color: var(--good); } .bad { color: var(--bad); }
+  .linkbtn { background: none; border: 0; color: var(--gold); padding: 0; font-size: 12px; text-decoration: underline; }
+  .breakdown { display: grid; grid-template-columns: minmax(240px, 360px) 1fr; gap: 24px; }
+  .breakdown dl { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; margin: 0; }
+  .breakdown dt { color: var(--muted); } .breakdown dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+  .breakdown .total { font-weight: 700; border-top: 1px solid var(--line); padding-top: 4px; }
+  svg.spark { width: 100%; max-width: 520px; height: 90px; display: block; }
   .empty { padding: 32px; text-align: center; color: var(--muted); }
   .foot { margin-top: 12px; color: var(--muted); font-size: 12px; }
-  @media (max-width: 600px) { h1 { font-size: 19px; } }
+  .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+           padding: 8px 14px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.on { opacity: 1; }
+  @media (max-width: 640px) { h1 { font-size: 19px; } .breakdown { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -59,48 +89,88 @@
   <header>
     <div>
       <h1><span>◆</span> Gold Deal Tracker</h1>
-      <div class="sub" id="sync">Loading…</div>
+      <div class="sub"><span id="sync">Loading…</span></div>
     </div>
     <div class="rate" id="rate">24K rate: —</div>
   </header>
 
-  <section class="panel">
+  <section class="panel" aria-label="Filters">
     <div class="controls">
-      <div><label for="f-retailer">Retailer</label><select id="f-retailer"><option value="">All</option></select></div>
-      <div><label for="f-weight">Weight</label><select id="f-weight"><option value="">All</option></select></div>
-      <div><label for="f-purity">Purity</label><select id="f-purity"><option value="">All</option></select></div>
-      <div><label for="f-form">Form</label><select id="f-form"><option value="">All</option></select></div>
-      <div><label>&nbsp;</label><button id="refresh" type="button">Refresh prices now</button></div>
+      <div><label class="lbl" for="f-retailer">Retailer</label><select id="f-retailer"><option value="">All</option></select></div>
+      <div><label class="lbl" for="f-brand">Brand</label><select id="f-brand"><option value="">All</option></select></div>
+      <div><label class="lbl" for="f-purity">Purity</label><select id="f-purity"><option value="">All</option></select></div>
+      <div><label class="lbl" for="f-form">Form</label><select id="f-form"><option value="">All</option></select></div>
+      <div><span class="lbl">&nbsp;</span><button class="btn" id="refresh" type="button">Refresh prices now</button></div>
     </div>
-    <div class="offers" id="offers"></div>
+    <div class="row" id="chips" role="group" aria-label="Quick select weight">
+      <span class="lbl" style="margin:0 4px 0 0">Weight</span>
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="f-coupon"> Only listings with a coupon</label>
+      <button class="linkbtn" id="share" type="button">Copy link to this view</button>
+    </div>
+    <div class="paywith" id="paywith" aria-label="Pay with"></div>
   </section>
 
+  <h2>Best value by weight</h2>
+  <div class="strip" id="strip"></div>
+
+  <h2>Ranked by ₹ per fine gram</h2>
   <div class="table-wrap">
     <table>
       <thead><tr>
-        <th data-k="rank" class="num">#</th>
-        <th data-k="title">Product</th>
-        <th data-k="weight_g" class="num">Weight · purity</th>
-        <th data-k="list_price" class="num">Listed</th>
-        <th data-k="effective" class="num">You pay</th>
-        <th data-k="per_fine_g" class="num" aria-sort="ascending">₹ / fine g</th>
-        <th data-k="premium_vs_spot" class="num">Vs spot</th>
-        <th data-k="stock">Stock</th>
+        <th data-k="rank" class="num"><button>#</button></th>
+        <th data-k="title"><button>Product</button></th>
+        <th data-k="weight_g" class="num"><button>Wt · purity</button></th>
+        <th data-k="effective" class="num"><button>You pay</button></th>
+        <th data-k="per_fine_g" class="num" aria-sort="ascending"><button>₹ / fine g</button></th>
+        <th data-k="premium_vs_spot" class="num"><button>Vs market</button></th>
+        <th data-k="stock"><button>Stock</button></th>
       </tr></thead>
-      <tbody id="rows"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+      <tbody id="rows"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
     </table>
   </div>
-  <p class="foot">₹ per fine gram = effective price ÷ (weight × purity). Effective price = listed − coupon − card discount + card fee − cashback.
-    Vs spot compares with today's 24K rate excluding 3% GST, so +3% is roughly break-even with buying at spot plus GST.
-    Coupons shown in the cart only, or for first orders, may not be reflected. Prices are estimates.</p>
+  <p class="foot">₹ per fine gram = effective price ÷ (weight × purity). Effective price = listed − coupon − card or wallet discount + card fee − cashback.
+    Vs market compares with today's 24K rate excluding 3% GST, so about +3% is break-even with buying at spot plus GST.
+    Cart-only and first-order coupons may not be reflected. Prices are estimates; check the retailer before buying.</p>
 </div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 const $ = s => document.querySelector(s);
-const inr = v => v == null ? "—" : "₹" + Math.round(v).toLocaleString("en-IN");
-const pct = v => v == null ? "—" : (v >= 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
-let META = null, DEALS = [], sortKey = "per_fine_g", sortDir = 1;
-const held = new Set();
+const inr = v => v == null ? "—" : (v < 0 ? "−" : "") + "₹" + Math.round(Math.abs(v)).toLocaleString("en-IN");
+const pct = v => v == null ? "—" : (v >= 0 ? "+" : "−") + Math.abs(v * 100).toFixed(1) + "%";
+const signed = v => v == null ? "—" : (v >= 0 ? "+" : "−") + "₹" + Math.round(Math.abs(v)).toLocaleString("en-IN");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const PURITY = {0.9999: "24K (999.9)", 0.999: "24K (999)", 0.995: "24K (995)", 0.916: "22K (916)", 0.75: "18K (750)"};
+const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+
+let META = null, DEALS = [], sortKey = "per_fine_g", sortDir = 1, open = new Set();
+const state = { retailer: "", brand: "", purity: "", form: "", weight: "", coupon: false, offers: new Set(), wallet: "" };
+
+function readUrl() {
+  const p = new URLSearchParams(location.search);
+  for (const k of ["retailer", "brand", "purity", "form", "weight", "wallet"]) state[k] = p.get(k) || "";
+  state.coupon = p.get("coupon") === "1";
+  if (p.has("offers")) state.offers = new Set(p.get("offers").split(",").filter(Boolean));
+  else META.my_offers.forEach(id => state.offers.add(id));
+}
+function writeUrl() {
+  const p = new URLSearchParams();
+  for (const k of ["retailer", "brand", "purity", "form", "weight", "wallet"]) if (state[k]) p.set(k, state[k]);
+  if (state.coupon) p.set("coupon", "1");
+  p.set("offers", [...state.offers].join(","));
+  history.replaceState(null, "", "?" + p);
+}
+
+function ago(iso) {
+  if (!iso) return "never";
+  const m = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return m + " min ago";
+  if (m < 48 * 60) return Math.round(m / 60) + " h ago";
+  return Math.round(m / 1440) + " days ago";
+}
 
 function fillSelect(el, values, fmt) {
   for (const v of values) { const o = document.createElement("option"); o.value = v; o.textContent = fmt(v); el.append(o); }
@@ -108,33 +178,96 @@ function fillSelect(el, values, fmt) {
 
 async function loadMeta() {
   META = await (await fetch("/api/meta")).json();
-  fillSelect($("#f-retailer"), META.retailers, v => v[0].toUpperCase() + v.slice(1));
-  fillSelect($("#f-weight"), META.weights, v => v + " g");
-  fillSelect($("#f-purity"), META.purities, v => ({0.9999: "999.9", 0.999: "24K (999)", 0.995: "24K (995)", 0.916: "22K (916)", 0.75: "18K"}[v] || v));
-  fillSelect($("#f-form"), META.forms, v => v[0].toUpperCase() + v.slice(1));
-  $("#rate").textContent = META.rate ? `24K: ${inr(META.rate.rate_24k)}/g · excl. GST` : "24K rate: not set";
-  $("#sync").textContent = META.last_sync ? "Prices last synced " + new Date(META.last_sync).toLocaleString("en-IN") : "No prices yet";
-  META.my_offers.forEach(id => held.add(id));
-  const box = $("#offers");
-  for (const o of META.offers.filter(o => o.kind !== "coupon" || true)) {
-    const l = document.createElement("label");
-    const c = document.createElement("input"); c.type = "checkbox"; c.checked = held.has(o.id);
-    c.onchange = () => { c.checked ? held.add(o.id) : held.delete(o.id); loadDeals(); };
-    l.append(c, `${o.label}${o.retailer ? " · " + o.retailer : ""}${o.first_order_only ? " (first order)" : ""}`);
-    box.append(l);
+  readUrl();
+  fillSelect($("#f-retailer"), META.retailers, cap);
+  fillSelect($("#f-brand"), META.brands, v => v);
+  fillSelect($("#f-purity"), META.purities, v => PURITY[v] || v);
+  fillSelect($("#f-form"), META.forms, cap);
+  for (const [id, k] of [["#f-retailer", "retailer"], ["#f-brand", "brand"], ["#f-purity", "purity"], ["#f-form", "form"]]) {
+    $(id).value = state[k];
+    $(id).onchange = () => { state[k] = $(id).value; loadDeals(); };
   }
+  $("#f-coupon").checked = state.coupon;
+  $("#f-coupon").onchange = () => { state.coupon = $("#f-coupon").checked; loadDeals(); };
+
+  const chips = $("#chips");
+  for (const w of ["", ...META.weights]) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chipbtn"; b.dataset.w = w;
+    b.textContent = w === "" ? "All" : w + " g";
+    b.onclick = () => { state.weight = String(w); loadDeals(); };
+    chips.append(b);
+  }
+
+  $("#rate").textContent = META.rate ? `24K: ${inr(META.rate.rate_24k)}/g · excl. GST` : "24K rate: not set";
+  const syncText = () => $("#sync").textContent = "Prices synced " + ago(META.last_sync) +
+    (META.rate ? " · rate from " + META.rate.source : "");
+  syncText(); setInterval(syncText, 60000);
+
+  const box = $("#paywith");
+  for (const o of META.offers) {
+    const l = document.createElement("label");
+    const c = document.createElement("input"); c.type = "checkbox"; c.checked = state.offers.has(o.id);
+    c.onchange = () => { c.checked ? state.offers.add(o.id) : state.offers.delete(o.id); loadDeals(); };
+    const span = document.createElement("span");
+    span.innerHTML = `${esc(o.label)}<span class="hint">${esc(cap(o.kind))}${o.retailer ? " · " + esc(cap(o.retailer)) : ""}${o.first_order_only ? " · first order only" : ""}</span>`;
+    l.append(c, span); box.append(l);
+  }
+  const wl = document.createElement("label");
+  wl.innerHTML = `<input type="checkbox" id="w-on"><span>Amazon Pay balance bought at <input type="number" id="w-pct" min="0" max="20" step="0.5" value="7" aria-label="Discount percent"> % off<span class="hint">Wallet · Amazon · no cap</span></span>`;
+  box.append(wl);
+  $("#w-on").checked = !!state.wallet;
+  if (state.wallet) $("#w-pct").value = state.wallet;
+  const syncWallet = () => { state.wallet = $("#w-on").checked ? $("#w-pct").value : ""; loadDeals(); };
+  $("#w-on").onchange = syncWallet; $("#w-pct").onchange = () => { if ($("#w-on").checked) syncWallet(); };
+}
+
+async function fetchDeals(extra = {}) {
+  const p = new URLSearchParams();
+  for (const k of ["retailer", "brand", "purity", "form"]) if (state[k]) p.set(k, state[k]);
+  if (state.coupon) p.set("coupon_only", "true");
+  if (state.wallet) p.set("wallet_pct", state.wallet);
+  p.set("offers", [...state.offers].join(","));
+  if (META.offers.some(o => o.first_order_only && state.offers.has(o.id))) p.set("first_order", "true");
+  for (const [k, v] of Object.entries(extra)) p.set(k, v);
+  return (await (await fetch("/api/deals?" + p)).json()).deals;
 }
 
 async function loadDeals() {
-  const p = new URLSearchParams();
-  for (const [id, k] of [["#f-retailer", "retailer"], ["#f-weight", "weight"], ["#f-purity", "purity"], ["#f-form", "form"]])
-    if ($(id).value) p.set(k, $(id).value);
-  p.set("offers", [...held].join(","));
-  if (META.offers.some(o => o.first_order_only && held.has(o.id))) p.set("first_order", "true");
-  DEALS = (await (await fetch("/api/deals?" + p)).json()).deals;
-  DEALS.forEach((d, i) => { d.rank = i + 1; d.effective = d.breakdown.effective_price; d.list_price = d.breakdown.list_price;
+  writeUrl();
+  document.querySelectorAll("#chips .chipbtn").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.w === state.weight)));
+  const all = await fetchDeals();               // every weight, for the best-by-weight strip
+  renderStrip(all);
+  DEALS = state.weight ? all.filter(d => String(d.weight_g) === state.weight) : all;
+  DEALS.forEach((d, i) => { d.rank = i + 1; d.effective = d.breakdown.effective_price;
                             d.stock = d.in_stock ? (d.stock_left ?? 9999) : -1; });
   render();
+}
+
+function renderStrip(all) {
+  const best = new Map();
+  for (const d of all) if (!best.has(d.weight_g)) best.set(d.weight_g, d);   // list is sorted cheapest first
+  const overall = all[0];
+  const strip = $("#strip"); strip.innerHTML = "";
+  if (!best.size) { strip.innerHTML = `<div class="sub">No deals yet.</div>`; return; }
+  for (const [w, d] of [...best].sort((a, b) => b[0] - a[0])) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "card" + (d === overall ? " top" : "");
+    b.innerHTML = `<div class="w">${w} g <span class="meta">${esc(PURITY[d.purity] || d.purity)}</span></div>
+      <div class="t">${esc(d.title)}</div>
+      <div class="p">${inr(d.per_fine_g)}<span class="meta"> / fine g</span></div>
+      <div class="meta">Pay ${inr(d.breakdown.effective_price)} · ${esc(cap(d.retailer))}${d === overall ? " · ★ best overall" : ""}</div>`;
+    b.onclick = () => { state.weight = String(w); loadDeals(); };
+    strip.append(b);
+  }
+}
+
+function changeBadge(d) {
+  let s = "";
+  if (d.price_change != null && d.price_change !== 0)
+    s += `<span class="badge ${d.price_change < 0 ? "drop" : "rise"}">${d.price_change < 0 ? "▼" : "▲"} ${inr(Math.abs(d.price_change))}</span> `;
+  if (d.at_30d_low) s += `<span class="badge low">30-day low</span>`;
+  return s;
 }
 
 function render() {
@@ -145,44 +278,93 @@ function render() {
   document.querySelectorAll("th").forEach(th => th.removeAttribute("aria-sort"));
   $(`th[data-k="${sortKey}"]`).setAttribute("aria-sort", sortDir > 0 ? "ascending" : "descending");
   const tb = $("#rows");
-  if (!rows.length) { tb.innerHTML = `<tr><td colspan="8" class="empty">No deals match. Import or collect prices first.</td></tr>`; return; }
+  if (!rows.length) { tb.innerHTML = `<tr><td colspan="7" class="empty">No deals match these filters.</td></tr>`; return; }
   tb.innerHTML = "";
   for (const d of rows) {
     const b = d.breakdown, tr = document.createElement("tr");
     if (d.rank === 1) tr.className = "best";
     const chips = [
       b.coupon ? `<span class="chip">${esc(b.coupon_label)} −${inr(b.coupon)}</span>` : "",
-      b.card ? `<span class="chip">${esc(b.card_label)} −${inr(b.card)}</span>` : "",
-      b.fee ? `<span class="chip">fee +${inr(b.fee)}</span>` : "",
-      b.cashback ? `<span class="chip">${esc(b.cashback_label)} −${inr(b.cashback)}</span>` : "",
+      b.card ? `<span class="chip">${esc(b.card_label.split(" (")[0])} −${inr(b.card)}</span>` : "",
+      b.cashback ? `<span class="chip">Cashback −${inr(b.cashback)}</span>` : "",
     ].join("");
-    const purityLabel = d.purity >= 0.999 ? "24K" : d.purity >= 0.99 ? "24K (995)" : d.purity >= 0.91 ? "22K" : d.purity;
+    const normalised = d.purity < 0.999;
     tr.innerHTML = `
       <td class="num">${d.rank}</td>
       <td class="title">${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.title)}</a>` : esc(d.title)}
-        <div class="meta">${esc(d.retailer)}${d.brand ? " · " + esc(d.brand) : ""} · ${esc(d.form || "")}</div></td>
-      <td class="num">${d.weight_g} g<div class="meta">${purityLabel} · ${d.fine_g} fine g</div></td>
-      <td class="num">${inr(b.list_price)}</td>
-      <td class="num"><span class="big">${inr(b.effective_price)}</span><div>${chips}</div>
-        ${b.cashback ? `<div class="meta">pay ${inr(b.pay_at_checkout)} at checkout</div>` : ""}</td>
-      <td class="num"><span class="big">${inr(d.per_fine_g)}</span><div class="meta">${inr(d.per_g_actual)}/g actual</div></td>
-      <td class="num ${d.premium_vs_spot < 0 ? "good" : d.premium_vs_spot > 0.03 ? "bad" : ""}">${pct(d.premium_vs_spot)}</td>
+        <div class="meta">${esc(cap(d.retailer))}${d.brand ? " · " + esc(d.brand) : ""} · ${esc(d.form || "")}</div>
+        <div>${changeBadge(d)}</div></td>
+      <td class="num">${d.weight_g} g<div class="meta">${esc(PURITY[d.purity] || d.purity)}</div></td>
+      <td class="num"><span class="big">${inr(b.effective_price)}</span>
+        ${b.effective_price !== b.list_price ? `<div class="meta"><s>${inr(b.list_price)}</s></div>` : ""}
+        <div>${chips}</div>
+        <button class="linkbtn" type="button" aria-expanded="${open.has(d.product_id)}">Price breakdown</button></td>
+      <td class="num"><span class="big">${inr(d.per_fine_g)}</span>
+        <div class="meta">${d.rank === 1 ? "★ Best value · " : ""}${normalised ? "eff. 24K / fine g" : "per fine g"}</div>
+        ${normalised ? `<div class="meta">${inr(d.per_g_actual)} / g actual</div>` : ""}</td>
+      <td class="num ${d.premium_vs_spot < 0 ? "good" : d.premium_vs_spot > 0.03 ? "bad" : ""}">
+        ${signed(d.premium_inr)}<div class="meta">${pct(d.premium_vs_spot)}</div></td>
       <td>${d.in_stock ? (d.stock_left ? d.stock_left + " left" : "In stock") : "Out of stock"}</td>`;
+    tr.querySelector(".linkbtn").onclick = () => {
+      open.has(d.product_id) ? open.delete(d.product_id) : open.add(d.product_id); render();
+    };
     tb.append(tr);
+    if (open.has(d.product_id)) tb.append(detailRow(d));
   }
 }
 
-function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c])); }
+function detailRow(d) {
+  const b = d.breakdown, tr = document.createElement("tr");
+  tr.className = "detail";
+  const line = (k, v, cls = "") => v ? `<dt class="${cls}">${esc(k)}</dt><dd class="${cls}">${v}</dd>` : "";
+  tr.innerHTML = `<td></td><td colspan="6"><div class="breakdown">
+    <dl>
+      ${line("Listed price", inr(b.list_price))}
+      ${line(b.coupon_label ? "Coupon " + b.coupon_label : "", b.coupon ? "−" + inr(b.coupon) : "")}
+      ${line(b.card_label || "", b.card ? "−" + inr(b.card) : "")}
+      ${line("Card fee", b.fee ? "+" + inr(b.fee) : "")}
+      ${line("You pay at checkout", inr(b.pay_at_checkout), "total")}
+      ${line(b.cashback_label || "", b.cashback ? "−" + inr(b.cashback) + " later" : "")}
+      ${line("Effective price", inr(b.effective_price), "total")}
+      ${line("Fine gold", d.fine_g + " g")}
+      ${line("₹ per fine gram", inr(d.per_fine_g))}
+      ${b.notes.map(n => `<dt class="hint">${esc(n)}</dt><dd></dd>`).join("")}
+    </dl>
+    <div><div class="meta">Listed price, last 30 days${d.low_30d ? " · low " + inr(d.low_30d) : ""}</div><div class="spark-slot">Loading…</div></div>
+  </div></td>`;
+  loadSpark(d.product_id, tr.querySelector(".spark-slot"));
+  return tr;
+}
 
-document.querySelectorAll("th").forEach(th => th.onclick = () => {
-  const k = th.dataset.k; sortDir = sortKey === k ? -sortDir : 1; sortKey = k; render();
+async function loadSpark(id, slot) {
+  const pts = (await (await fetch(`/api/history/${id}`)).json()).points;
+  if (pts.length < 2) { slot.innerHTML = `<div class="hint">Not enough history yet. Each refresh adds a point.</div>`; return; }
+  const W = 520, H = 90, P = 6;
+  const xs = pts.map(p => +new Date(p.seen_at)), ys = pts.map(p => p.list_price);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const X = x => P + (x - x0) / ((x1 - x0) || 1) * (W - 2 * P);
+  const Y = y => H - P - (y - y0) / ((y1 - y0) || 1) * (H - 2 * P);
+  const path = pts.map((p, i) => (i ? "L" : "M") + X(xs[i]).toFixed(1) + " " + Y(ys[i]).toFixed(1)).join(" ");
+  const last = pts.length - 1;
+  slot.innerHTML = `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="Price from ${inr(ys[0])} to ${inr(ys[last])}">
+    <path d="${path}" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="${X(xs[last])}" cy="${Y(ys[last])}" r="3.5" fill="var(--gold)"/></svg>
+    <div class="meta">${new Date(x0).toLocaleDateString("en-IN")} ${inr(ys[0])} → now ${inr(ys[last])} · high ${inr(y1)}</div>`;
+}
+
+document.querySelectorAll("th button").forEach(btn => btn.onclick = () => {
+  const k = btn.parentElement.dataset.k; sortDir = sortKey === k ? -sortDir : 1; sortKey = k; render();
 });
-["#f-retailer", "#f-weight", "#f-purity", "#f-form"].forEach(id => $(id).onchange = loadDeals);
 $("#refresh").onclick = async () => {
   const btn = $("#refresh"); btn.disabled = true; btn.textContent = "Refreshing…";
   try { await fetch("/api/refresh", {method: "POST"}); } finally { btn.disabled = false; btn.textContent = "Refresh prices now"; }
-  await loadDeals();
+  location.reload();
 };
+$("#share").onclick = async () => {
+  try { await navigator.clipboard.writeText(location.href); toast("Link copied"); } catch { toast("Copy the address bar to share"); }
+};
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); setTimeout(() => t.classList.remove("on"), 1800); }
+
 loadMeta().then(loadDeals);
 </script>
 </body>
