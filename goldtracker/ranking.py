@@ -9,6 +9,9 @@ from . import db
 from .offers import Offer, apply_offers
 
 GST = 0.03  # GST on gold in India
+# A real bullion listing can't be far below spot or wildly above it. Outside this band the title's
+# weight is almost certainly wrong ("500 g" meaning 500 mg) or it isn't plain bullion (studded, plated).
+SANE_PREMIUM = (-0.25, 0.60)
 
 
 @dataclass
@@ -53,7 +56,9 @@ def spot_per_fine_gram(rate_24k: float) -> float:
 def rank(conn: sqlite3.Connection, offers: list[Offer], *, held: set[str] | None = None,
          include_first_order: bool = False, retailer: str | None = None, weight_g: float | None = None,
          purity: float | None = None, form: str | None = None, in_stock_only: bool = True,
-         brand: str | None = None, coupon_only: bool = False) -> list[RankedDeal]:
+         brand: str | None = None, coupon_only: bool = False,
+         rejected: list | None = None) -> list[RankedDeal]:
+    """Rank listings. Pass a list as `rejected` to collect listings dropped by the sanity check."""
     rate_row = db.latest_rate(conn)
     spot = spot_per_fine_gram(rate_row["rate_24k"]) if rate_row else None
     stats = db.price_stats(conn)
@@ -79,6 +84,15 @@ def rank(conn: sqlite3.Connection, offers: list[Offer], *, held: set[str] | None
         b = apply_offers(r["list_price"], r["retailer"], offers, held=held,
                          include_first_order=include_first_order, listing_coupon=coupon)
         pfg = per_fine_gram(b.effective_price, r["weight_g"], r["purity"])
+        if spot:
+            # judge on the listed price so a big coupon can't make a real deal look "insane"
+            raw = per_fine_gram(r["list_price"], r["weight_g"], r["purity"]) / spot - 1
+            if not SANE_PREMIUM[0] <= raw <= SANE_PREMIUM[1]:
+                if rejected is not None:
+                    rejected.append({"id": r["id"], "retailer": r["retailer"], "title": r["title"],
+                                     "weight_g": r["weight_g"], "list_price": r["list_price"],
+                                     "premium_vs_spot": round(raw, 3)})
+                continue
         deals.append(RankedDeal(
             product_id=r["id"], retailer=r["retailer"], title=r["title"], brand=r["brand"], url=r["url"],
             form=r["form"], weight_g=r["weight_g"], purity=r["purity"],

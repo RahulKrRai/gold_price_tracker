@@ -19,6 +19,9 @@ _NUM = r"(\d+(?:\.\d+)?)"
 _UNIT = r"(?:grams?|grm?s?|gms?|g)"
 WEIGHT_RE = re.compile(rf"(?<![\d.]){_NUM}\s*{_UNIT}(?![a-z])", re.I)
 SUM_RE = re.compile(rf"{_NUM}\s*{_UNIT}(?:\s*\+\s*{_NUM}\s*{_UNIT})+", re.I)
+# "2+2 GM", "2 + 1 gm combo": unit only after the last number
+SUM_SHARED_UNIT_RE = re.compile(rf"(?<![\d.]){_NUM}((?:\s*\+\s*\d+(?:\.\d+)?)+)\s*{_UNIT}(?![a-z])", re.I)
+MG_RE = re.compile(r"(?<![\d.])(\d+(?:\.\d+)?)\s*(?:mg|milligrams?)(?![a-z])", re.I)
 EACH_RE = re.compile(rf"{_NUM}\s*{_UNIT}\s*each", re.I)
 COUNT_RE = re.compile(r"(?:(?:pack|set)\s*of\s*(\d+))|(?:x\s*(\d+)\s*(?:pcs?|pieces?|nos?)?)", re.I)
 
@@ -28,7 +31,9 @@ KARAT_RE = re.compile(r"(?<![\d.])(24|23|22|18|14)\s*(?:k|kt|kts|karat|carat|ct)
 FINENESS_TO_PURITY = {"999.9": 0.9999, "999": 0.999, "995": 0.995, "916": 0.916, "750": 0.75, "585": 0.585}
 KARAT_TO_PURITY = {"24": 0.999, "23": 0.958, "22": 0.916, "18": 0.75, "14": 0.585}
 
-EXCLUDE_RE = re.compile(r"\b(plated|gold[- ]?plated|imitation|covering|one gram gold|silver coin|silver bar)\b", re.I)
+EXCLUDE_RE = re.compile(
+    r"\b(plated|gold[- ]?plated|gold[- ]?toned|imitation|covering|one gram gold|silver coin|silver bar|brass|"
+    r"diamond[- ]studded|studded|necklace|chain|earrings?)\b", re.I)
 
 
 @dataclass(frozen=True)
@@ -53,6 +58,12 @@ def _weight_from(text: str) -> float | None:
     m = SUM_RE.search(text)
     if m:
         return round(sum(float(x) for x in WEIGHT_RE.findall(m.group(0))), 4)
+    m = SUM_SHARED_UNIT_RE.search(text)
+    if m:
+        return round(float(m.group(1)) + sum(float(x) for x in re.findall(r"\d+(?:\.\d+)?", m.group(2))), 4)
+    m = MG_RE.search(text)
+    if m:
+        return round(float(m.group(1)) / 1000, 4)
     m = EACH_RE.search(text)
     if m:
         c = COUNT_RE.search(text)
