@@ -61,3 +61,32 @@ def test_excludes_non_bullion(title):
 
 def test_fine_grams():
     assert parse_title("Kalyan 22K 916 Coin 10 g").fine_grams == pytest.approx(9.16)
+
+
+# Real Myntra titles seen on 2026-10-16
+@pytest.mark.parametrize("title,weight", [
+    ("Angara 24KT (999) 2+2 GM Combo Lakshmi Gold Coin", 4),
+    ("Angara 24KT (999) 2+1 GM Combo Lakshmi Gold Coin", 3),
+    ("PARSHWA PADMAVATI GOLD Happy Wedding Var Vadhu Jodi Design 999 Gold Coin - 50 mg", 0.05),
+    ("PARSHWA PADMAVATI GOLD (999) 24KT Gold Coin- 0.025g", 0.025),
+    ("PMJ Jewels Goddess Lakshmi 22KT Gold Coin- 0.500 gm", 0.5),
+    ("C KRISHNIAH CHETTY JEWELLERS PVT LTD Set Of 2 24Kt Gold Coin-2g", 2),
+    ("Mia by Tanishq 0.5 Gram 24 Karat Tulsi Gold Coin", 0.5),
+])
+def test_myntra_weights(title, weight):
+    assert parse_title(title).weight_g == pytest.approx(weight)
+
+
+@pytest.mark.parametrize("title", [
+    "White Mango Decor Brass Coin",
+    "Divine Solitaires 0.18ct Diamond Studded 22kt Gold Coin 3gm",
+    "Designs & You Gold-Plated Bar-Shaped Necklace",
+    "Accessorize London Green & Gold-Toned Brass T Bar & Coin Charm Necklace",
+])
+def test_excludes_myntra_non_bullion(title):
+    assert parse_title(title).excluded
+
+
+def test_brand_with_diamond_in_name_is_not_excluded():
+    assert not parse_title("Zen Diamond India 24 KT Gold Coin- 5 gm").excluded
+    assert not parse_title("Malabar Gold & Diamonds 24KT 999 Purity Rose Gold Bar - 5 g").excluded

@@ -140,3 +140,14 @@ def test_csv_backfill_builds_history(tmp_path):
     assert rows[0]["seen_at"] == "2026-10-09T18:30:00+00:00"  # midnight IST in UTC
     d = rank(c, [])[0]
     assert d.prev_price == 16000 and d.price_change == -500
+
+
+def test_sanity_check_drops_mislabelled_weight(conn):
+    # "500 g" for INR 8,880 is really 500 mg: must not top the ranking
+    from goldtracker.collectors import RawListing
+    save_listings(conn, [RawListing(retailer="myntra", retailer_sku="bad", price=8880,
+                                    title="C KRISHNIAH CHETTY 24KT Gold Goddess Lakshmi Coin - 500 g")])
+    rejected = []
+    deals = rank(conn, [], rejected=rejected)
+    assert all(d.title.find("500 g") < 0 for d in deals)
+    assert rejected and rejected[0]["premium_vs_spot"] < -0.9
