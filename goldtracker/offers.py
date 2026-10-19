@@ -4,15 +4,19 @@ Order of application (matches how Indian retailers usually price checkout):
   1. Best single coupon (listing coupon or a stored coupon offer). Coupons don't stack.
   2. Card discount on the amount after the coupon, respecting min spend and max cap, plus any fee.
   3. Cashback (credited later) on the amount after the coupon.
-Only offers the buyer actually holds (MY_OFFERS) are applied. First-order-only offers are skipped
-unless INCLUDE_FIRST_ORDER is on.
+Only offers the buyer actually holds (MY_OFFERS) are applied, except `public` offers (sale-wide
+coupons anyone can use, e.g. a Myntra flash coupon), which always apply. First-order-only offers are
+skipped unless INCLUDE_FIRST_ORDER is on. Offers outside valid_from/valid_until are ignored.
 """
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+IST = timezone(timedelta(hours=5, minutes=30))
 
 
 @dataclass(frozen=True)
@@ -28,6 +32,14 @@ class Offer:
     fee: float = 0.0
     first_order_only: bool = False
     tiers: tuple["Offer", ...] = ()  # extra spend slabs, e.g. SBI "+ up to 2,500 extra"
+    public: bool = False             # applies to everyone (sale coupon), no need to hold it
+    valid_from: str | None = None    # ISO date/time; naive values are India time
+    valid_until: str | None = None
+
+    def is_active(self, now: datetime | None = None) -> bool:
+        now = now or _now()
+        return ((self.valid_from is None or _when(self.valid_from, end=False) <= now)
+                and (self.valid_until is None or now <= _when(self.valid_until, end=True)))
 
     def discount_on(self, amount: float) -> float:
         """INR off for this offer on `amount` (fee not included). 0 if min spend isn't met."""
@@ -53,6 +65,7 @@ class Offer:
             min_spend=float(d.get("min_spend", 0)),
             max_cap=None if d.get("max_cap") is None else float(d["max_cap"]),
             fee=float(d.get("fee", 0)), first_order_only=bool(d.get("first_order_only", False)), tiers=tiers,
+            public=bool(d.get("public", False)), valid_from=d.get("valid_from"), valid_until=d.get("valid_until"),
         )
 
 
@@ -87,11 +100,42 @@ class Breakdown:
         }
 
 
-def load_offers(path: Path | str) -> list[Offer]:
+def _now() -> datetime:
+    """Current India time; tests replace this to pin the date."""
+    return datetime.now(IST)
+
+
+def _when(value: str, *, end: bool) -> datetime:
+    """'2026-10-20' means the whole day (start or end of it); naive times are India time."""
+    if len(value) == 10:
+        dt = datetime.fromisoformat(value) + (timedelta(days=1, microseconds=-1) if end else timedelta())
+    else:
+        dt = datetime.fromisoformat(value)
+    return dt if dt.tzinfo else dt.replace(tzinfo=IST)
+
+
+def load_offers(path: Path | str, now: datetime | None = None, include_inactive: bool = False) -> list[Offer]:
     p = Path(path)
     if not p.exists():
         return []
-    return [Offer.from_dict(d) for d in json.loads(p.read_text(encoding="utf-8")) if d.get("active", True)]
+    offers = [Offer.from_dict(d) for d in json.loads(p.read_text(encoding="utf-8")) if d.get("active", True)]
+    return offers if include_inactive else [o for o in offers if o.is_active(now)]
+
+
+def add_offer(path: Path | str, offer: dict) -> None:
+    """Add or replace an offer (by id) in the offers file."""
+    p = Path(path)
+    data = json.loads(p.read_text(encoding="utf-8")) if p.exists() else []
+    data = [d for d in data if d.get("id") != offer["id"]] + [offer]
+    p.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def remove_offer(path: Path | str, offer_id: str) -> bool:
+    p = Path(path)
+    data = json.loads(p.read_text(encoding="utf-8")) if p.exists() else []
+    kept = [d for d in data if d.get("id") != offer_id]
+    p.write_text(json.dumps(kept, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return len(kept) < len(data)
 
 
 def apply_offers(list_price: float, retailer: str, offers: list[Offer], *, held: set[str] | None = None,
@@ -104,7 +148,7 @@ def apply_offers(list_price: float, retailer: str, offers: list[Offer], *, held:
     b = Breakdown(list_price=list_price)
     usable = [o for o in offers
               if o.applies_to(retailer)
-              and (held is None or o.id in held)
+              and (held is None or o.public or o.id in held)
               and (include_first_order or not o.first_order_only)]
 
     # 1. best single coupon

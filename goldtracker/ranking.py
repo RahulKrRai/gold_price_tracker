@@ -39,6 +39,10 @@ class RankedDeal:
     prev_price: float | None = None        # previous different list price
     price_change: float | None = None      # latest list price - previous price
     at_30d_low: bool = False
+    benchmark: str | None = None           # rate source used for premium_vs_spot
+    premiums: dict | None = None           # {source: premium} for every rate source we have
+    overridden: bool = False               # weight/purity set by hand
+    retailer_sku: str | None = None
 
     def as_dict(self) -> dict:
         return self.__dict__.copy()
@@ -57,10 +61,14 @@ def rank(conn: sqlite3.Connection, offers: list[Offer], *, held: set[str] | None
          include_first_order: bool = False, retailer: str | None = None, weight_g: float | None = None,
          purity: float | None = None, form: str | None = None, in_stock_only: bool = True,
          brand: str | None = None, coupon_only: bool = False,
-         rejected: list | None = None) -> list[RankedDeal]:
-    """Rank listings. Pass a list as `rejected` to collect listings dropped by the sanity check."""
-    rate_row = db.latest_rate(conn)
+         rejected: list | None = None, rate_sources: list[str] | None = None) -> list[RankedDeal]:
+    """Rank listings. Pass a list as `rejected` to collect listings dropped by the sanity check.
+
+    rate_sources: preference order for the benchmark rate (first one available wins); premiums
+    against every other stored source are reported in `premiums`."""
+    rate_row = db.benchmark_rate(conn, rate_sources or [])
     spot = spot_per_fine_gram(rate_row["rate_24k"]) if rate_row else None
+    others = {src: spot_per_fine_gram(row["rate_24k"]) for src, row in db.latest_rates(conn).items()}
     stats = db.price_stats(conn)
     deals: list[RankedDeal] = []
     for r in db.latest_listings(conn):
@@ -89,7 +97,8 @@ def rank(conn: sqlite3.Connection, offers: list[Offer], *, held: set[str] | None
             raw = per_fine_gram(r["list_price"], r["weight_g"], r["purity"]) / spot - 1
             if not SANE_PREMIUM[0] <= raw <= SANE_PREMIUM[1]:
                 if rejected is not None:
-                    rejected.append({"id": r["id"], "retailer": r["retailer"], "title": r["title"],
+                    rejected.append({"id": r["id"], "retailer": r["retailer"], "retailer_sku": r["retailer_sku"],
+                                     "title": r["title"],
                                      "weight_g": r["weight_g"], "list_price": r["list_price"],
                                      "premium_vs_spot": round(raw, 3)})
                 continue
@@ -103,6 +112,9 @@ def rank(conn: sqlite3.Connection, offers: list[Offer], *, held: set[str] | None
             premium_vs_spot_gst=round(pfg / (spot * (1 + GST)) - 1, 4) if spot else None,
             premium_inr=round(pfg - spot, 2) if spot else None,
             has_coupon=bool(r["coupon_value"]),
+            benchmark=rate_row["source"] if rate_row else None,
+            premiums={src: round(pfg / sp - 1, 4) for src, sp in others.items()},
+            overridden=bool(r["overridden"]), retailer_sku=r["retailer_sku"],
         ))
         s = stats.get(r["id"])
         if s:
@@ -118,8 +130,7 @@ def rank(conn: sqlite3.Connection, offers: list[Offer], *, held: set[str] | None
 
 
 def unparsed(conn: sqlite3.Connection) -> list[dict]:
-    """Products whose weight or purity couldn't be read from the title."""
-    rows = conn.execute(
-        "SELECT id, retailer, title, weight_g, purity FROM products WHERE weight_g IS NULL OR purity IS NULL"
-    ).fetchall()
-    return [dict(r) for r in rows]
+    """Products whose weight or purity is still unknown after overrides."""
+    return [{"id": r["id"], "retailer": r["retailer"], "retailer_sku": r["retailer_sku"], "title": r["title"],
+             "weight_g": r["weight_g"], "purity": r["purity"]}
+            for r in db.latest_listings(conn) if r["weight_g"] is None or r["purity"] is None]

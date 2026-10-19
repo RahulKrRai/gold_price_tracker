@@ -1,4 +1,4 @@
-"""SQLite storage: products, prices, offers, gold_rates."""
+"""SQLite storage: products, prices, offers, gold_rates, runs, overrides."""
 
 from __future__ import annotations
 
@@ -54,10 +54,34 @@ CREATE TABLE IF NOT EXISTS offers (
 
 CREATE TABLE IF NOT EXISTS gold_rates (
     id          INTEGER PRIMARY KEY,
-    fetched_at  TEXT NOT NULL,
+    fetched_at  TEXT NOT NULL,               -- when we read it
     rate_24k    REAL NOT NULL,               -- INR per gram, excl. GST
     rate_22k    REAL NOT NULL,
-    source      TEXT NOT NULL
+    source      TEXT NOT NULL,               -- 'ibja', 'tanishq', 'manual', 'url', ...
+    as_of       TEXT,                        -- when the source published it (ISO); NULL = unknown
+    session     TEXT                         -- 'AM' / 'PM' for IBJA
+);
+
+CREATE TABLE IF NOT EXISTS runs (
+    id          INTEGER PRIMARY KEY,
+    job         TEXT NOT NULL,               -- 'myntra', 'amazon', 'rates'
+    started_at  TEXT NOT NULL,
+    finished_at TEXT,
+    ok          INTEGER NOT NULL DEFAULT 0,
+    count       INTEGER,
+    error       TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_runs_job_time ON runs(job, started_at DESC);
+
+CREATE TABLE IF NOT EXISTS overrides (
+    retailer     TEXT NOT NULL,
+    retailer_sku TEXT NOT NULL,
+    weight_g     REAL,                       -- NULL = keep parsed value
+    purity       REAL,
+    exclude      INTEGER NOT NULL DEFAULT 0, -- 1 = hide this listing
+    note         TEXT,
+    updated_at   TEXT NOT NULL,
+    PRIMARY KEY (retailer, retailer_sku)
 );
 
 CREATE TABLE IF NOT EXISTS alerts_sent (
@@ -82,8 +106,19 @@ def connect(path: Path | str) -> sqlite3.Connection:
     return conn
 
 
+# Columns added after v0.2; added in place so existing databases keep working.
+MIGRATIONS = {
+    "gold_rates": {"as_of": "TEXT", "session": "TEXT"},
+}
+
+
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    for table, cols in MIGRATIONS.items():
+        have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        for col, typ in cols.items():
+            if col not in have:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
     conn.commit()
 
 
@@ -129,15 +164,100 @@ def add_price(conn: sqlite3.Connection, product_id: int, *, list_price: float, m
     )
 
 
-def save_rate(conn: sqlite3.Connection, rate_24k: float, source: str, rate_22k: float | None = None) -> None:
+def save_rate(conn: sqlite3.Connection, rate_24k: float, source: str, rate_22k: float | None = None,
+              as_of: str | None = None, session: str | None = None) -> None:
+    """Store a rate. Skips exact repeats (same source, as_of and value) so twice-a-day polling
+    of an unchanged rate doesn't pile up rows."""
+    if as_of is not None and conn.execute(
+        "SELECT 1 FROM gold_rates WHERE source = ? AND as_of = ? AND rate_24k = ?", (source, as_of, rate_24k)
+    ).fetchone():
+        return
     conn.execute(
-        "INSERT INTO gold_rates (fetched_at, rate_24k, rate_22k, source) VALUES (?, ?, ?, ?)",
-        (now_iso(), rate_24k, rate_22k if rate_22k is not None else round(rate_24k * 0.916, 2), source),
+        "INSERT INTO gold_rates (fetched_at, rate_24k, rate_22k, source, as_of, session) VALUES (?, ?, ?, ?, ?, ?)",
+        (now_iso(), rate_24k, rate_22k if rate_22k is not None else round(rate_24k * 0.916, 2), source,
+         as_of, session),
     )
 
 
-def latest_rate(conn: sqlite3.Connection) -> sqlite3.Row | None:
-    return conn.execute("SELECT * FROM gold_rates ORDER BY fetched_at DESC, id DESC LIMIT 1").fetchone()
+def latest_rate(conn: sqlite3.Connection, source: str | None = None) -> sqlite3.Row | None:
+    """Most recent rate, overall or for one source (ordered by the source's own time when known)."""
+    where, args = ("WHERE source = ?", (source,)) if source else ("", ())
+    return conn.execute(
+        f"SELECT * FROM gold_rates {where} ORDER BY COALESCE(as_of, fetched_at) DESC, id DESC LIMIT 1", args
+    ).fetchone()
+
+
+def latest_rates(conn: sqlite3.Connection) -> dict[str, sqlite3.Row]:
+    """Latest rate row per source."""
+    return {r["source"]: latest_rate(conn, r["source"])
+            for r in conn.execute("SELECT DISTINCT source FROM gold_rates")}
+
+
+def benchmark_rate(conn: sqlite3.Connection, sources: list[str]) -> sqlite3.Row | None:
+    """First configured source that has a rate; otherwise the newest rate of any source."""
+    for s in sources:
+        row = latest_rate(conn, s)
+        if row is not None:
+            return row
+    return latest_rate(conn)
+
+
+# --- job runs ---------------------------------------------------------------------------
+
+def start_run(conn: sqlite3.Connection, job: str) -> int:
+    cur = conn.execute("INSERT INTO runs (job, started_at) VALUES (?, ?)", (job, now_iso()))
+    conn.commit()
+    return int(cur.lastrowid)
+
+
+def finish_run(conn: sqlite3.Connection, run_id: int, *, ok: bool, count: int | None = None,
+               error: str | None = None) -> None:
+    conn.execute("UPDATE runs SET finished_at = ?, ok = ?, count = ?, error = ? WHERE id = ?",
+                 (now_iso(), int(ok), count, (error or "")[:500] or None, run_id))
+    conn.commit()
+
+
+def last_runs(conn: sqlite3.Connection) -> dict[str, dict]:
+    """Per job: last attempt and last success."""
+    out: dict[str, dict] = {}
+    for r in conn.execute("SELECT DISTINCT job FROM runs"):
+        job = r["job"]
+        last = conn.execute("SELECT * FROM runs WHERE job = ? ORDER BY started_at DESC, id DESC LIMIT 1",
+                            (job,)).fetchone()
+        ok = conn.execute("SELECT finished_at FROM runs WHERE job = ? AND ok = 1 ORDER BY started_at DESC, id DESC "
+                          "LIMIT 1", (job,)).fetchone()
+        out[job] = {"last_attempt": last["started_at"], "last_ok": bool(last["ok"]), "last_error": last["error"],
+                    "last_success": ok["finished_at"] if ok else None, "last_count": last["count"]}
+    return out
+
+
+def last_seen_by_retailer(conn: sqlite3.Connection) -> dict[str, str]:
+    return {r["retailer"]: r["seen"] for r in conn.execute(
+        "SELECT p.retailer, MAX(pr.seen_at) AS seen FROM prices pr JOIN products p ON p.id = pr.product_id "
+        "GROUP BY p.retailer")}
+
+
+# --- overrides ----------------------------------------------------------------------------
+
+def set_override(conn: sqlite3.Connection, retailer: str, retailer_sku: str, *, weight_g: float | None = None,
+                 purity: float | None = None, exclude: bool = False, note: str | None = None) -> None:
+    conn.execute(
+        """INSERT INTO overrides (retailer, retailer_sku, weight_g, purity, exclude, note, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (retailer, retailer_sku) DO UPDATE SET
+               weight_g = COALESCE(excluded.weight_g, overrides.weight_g),
+               purity = COALESCE(excluded.purity, overrides.purity),
+               exclude = excluded.exclude, note = COALESCE(excluded.note, overrides.note),
+               updated_at = excluded.updated_at""",
+        (retailer, str(retailer_sku), weight_g, purity, int(exclude), note, now_iso()),
+    )
+    conn.commit()
+
+
+def remove_override(conn: sqlite3.Connection, retailer: str, retailer_sku: str) -> bool:
+    cur = conn.execute("DELETE FROM overrides WHERE retailer = ? AND retailer_sku = ?", (retailer, str(retailer_sku)))
+    conn.commit()
+    return cur.rowcount > 0
 
 
 def price_stats(conn: sqlite3.Connection, days: int = 30) -> dict[int, dict]:
@@ -180,13 +300,20 @@ def price_history(conn: sqlite3.Connection, product_id: int, days: int = 30) -> 
 
 def latest_listings(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     """Each product with its most recent price row."""
+    # Manual overrides win over parsed weight/purity; excluded listings are dropped.
     return conn.execute(
         """
-        SELECT p.*, pr.list_price, pr.mrp, pr.coupon_code, pr.coupon_value, pr.in_stock,
+        SELECT p.id, p.retailer, p.retailer_sku, p.title, p.brand, p.url, p.form, p.first_seen, p.last_seen,
+               COALESCE(o.weight_g, p.weight_g) AS weight_g,
+               COALESCE(o.purity, p.purity) AS purity,
+               (o.retailer IS NOT NULL) AS overridden,
+               pr.list_price, pr.mrp, pr.coupon_code, pr.coupon_value, pr.in_stock,
                pr.stock_left, pr.seen_at
         FROM products p
         JOIN prices pr ON pr.id = (
             SELECT id FROM prices WHERE product_id = p.id ORDER BY seen_at DESC, id DESC LIMIT 1
         )
+        LEFT JOIN overrides o ON o.retailer = p.retailer AND o.retailer_sku = p.retailer_sku
+        WHERE COALESCE(o.exclude, 0) = 0
         """
     ).fetchall()

@@ -37,9 +37,34 @@ class Settings:
         default_factory=lambda: os.getenv("INCLUDE_FIRST_ORDER", "false").lower() in {"1", "true", "yes"}
     )
     refresh_minutes: int = field(default_factory=lambda: int(os.getenv("REFRESH_MINUTES", "45")))
+    # First source is the benchmark for "vs market"; others are shown alongside
+    rate_sources: list[str] = field(default_factory=lambda: _list("GOLD_RATE_SOURCES", "ibja,tanishq"))
+    # Twice a day on weekdays, after IBJA's AM and PM sessions (IST, "HH:MM")
+    rate_times: list[str] = field(default_factory=lambda: _list("RATE_REFRESH_TIMES", "11:00,17:00"))
+    publish_dir: Path = field(default_factory=lambda: ROOT / os.getenv("PUBLISH_DIR", "site"))
+    publish_git_push: bool = field(
+        default_factory=lambda: os.getenv("PUBLISH_GIT_PUSH", "false").lower() in {"1", "true", "yes"})
+    # Amazon Creators API (replaced PA-API 5 on 2026-04-30)
+    amazon_client_id: str = field(default_factory=lambda: os.getenv("AMAZON_CLIENT_ID", "").strip())
+    amazon_client_secret: str = field(default_factory=lambda: os.getenv("AMAZON_CLIENT_SECRET", "").strip())
+    amazon_partner_tag: str = field(default_factory=lambda: os.getenv("AMAZON_PARTNER_TAG", "").strip())
+    amazon_credential_version: str = field(
+        default_factory=lambda: os.getenv("AMAZON_CREDENTIAL_VERSION", "").strip())
+    amazon_token_url: str = field(default_factory=lambda: os.getenv("AMAZON_TOKEN_URL", "").strip())
+    amazon_api_base: str = field(
+        default_factory=lambda: os.getenv("AMAZON_API_BASE", "https://creatorsapi.amazon/catalog/v1/").strip())
+    amazon_marketplace: str = field(default_factory=lambda: os.getenv("AMAZON_MARKETPLACE", "www.amazon.in").strip())
+    amazon_keywords: list[str] = field(
+        default_factory=lambda: _list("AMAZON_KEYWORDS", "24k gold coin,gold bar 999,22k gold coin"))
+
     telegram_token: str = field(default_factory=lambda: os.getenv("TELEGRAM_BOT_TOKEN", "").strip())
     telegram_chat_id: str = field(default_factory=lambda: os.getenv("TELEGRAM_CHAT_ID", "").strip())
     alert_below: float | None = field(default_factory=lambda: _float("ALERT_BELOW_PER_FINE_G"))
+
+    def refresh_minutes_for(self, retailer: str) -> int:
+        """Per-retailer interval, e.g. REFRESH_MINUTES_MYNTRA=15; falls back to REFRESH_MINUTES."""
+        raw = os.getenv(f"REFRESH_MINUTES_{retailer.upper()}", "").strip()
+        return int(raw) if raw else self.refresh_minutes
 
 
 def get_settings() -> Settings:
