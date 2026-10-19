@@ -1,0 +1,31 @@
+{
+  "hasNextPage": true,
+  "totalCount": 261,
+  "products": [
+    {"productId": 23250690, "productName": "BHIMA Floral 24K 999 Purity Gold Bar 1 gram", "brand": "BHIMA",
+     "price": 16072, "mrp": 16876, "landingPageUrl": "gold-coin/bhima/bhima-floral-24k-999-purity-gold-bar-1-gram/23250690/buy",
+     "inventoryInfo": [{"available": true, "inventory": 1927}],
+     "couponData": {"couponDiscount": 500, "couponDescription": {"couponCode": "BFF500"}},
+     "articleType": {"typeName": "Gold Coin"}},
+    {"productId": 31416965, "productName": "Kalyan Jewellers 24K (999) Purity Lord Ganesh Gold Coin 1 Gms",
+     "brand": "Kalyan Jewellers", "price": 16080, "mrp": 17688,
+     "landingPageUrl": "gold-coin/kalyan+jewellers/kalyan-jewellers-24k-999-purity-lord-ganesh-gold-coin-1-gms/31416965/buy",
+     "inventoryInfo": [{"available": true, "inventory": 5}],
+     "couponData": {"couponDiscount": 500, "couponDescription": {"couponCode": "BFF500"}},
+     "articleType": {"typeName": "Gold Coin"}},
+    {"productId": 22810428, "productName": "BANGALORE REFINERY 24KT 999.9 Purity Gold Bar-1 g",
+     "brand": "BANGALORE REFINERY", "price": 16372, "mrp": 18001,
+     "landingPageUrl": "gold-coin/bangalore+refinery/bangalore-refinery-24kt-9999-purity-gold-bar-1-g/22810428/buy",
+     "inventoryInfo": [{"available": true, "inventory": 49}], "couponData": null,
+     "articleType": {"typeName": "Gold Coin"}},
+    {"productId": 32151750, "productName": "Designs & You Gold-Plated Bar-Shaped Necklace", "brand": "Designs & You",
+     "price": 273, "mrp": 1369, "landingPageUrl": "necklace-and-chains/designs+%26+you/x/32151750/buy",
+     "inventoryInfo": [{"available": true, "inventory": 300}],
+     "couponData": {"couponDiscount": 137, "couponDescription": {"couponCode": "BFF50OFF"}},
+     "articleType": {"typeName": "Necklace and Chains"}},
+    {"productId": 99999999, "productName": "Sold Out 24K 999 Gold Coin 2 g", "brand": "Test",
+     "price": 32000, "mrp": 33000, "landingPageUrl": "gold-coin/test/x/99999999/buy",
+     "inventoryInfo": [{"available": false, "inventory": 0}], "couponData": null,
+     "articleType": {"typeName": "Gold Coin"}}
+  ]
+}
