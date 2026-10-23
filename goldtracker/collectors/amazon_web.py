@@ -17,7 +17,7 @@ from __future__ import annotations
 from urllib.parse import quote_plus
 
 from .base import RawListing
-from .browser import browse, money
+from .browser import browse, money, why_empty
 
 QUERIES = ["24k gold coin", "gold bar 999", "22k gold coin"]
 PAGES_PER_QUERY = 2
@@ -69,5 +69,5 @@ def collect(headless: bool = True) -> list[RawListing]:
         for it in parse(cards):
             seen.setdefault(it.retailer_sku, it)
     if not seen:
-        raise RuntimeError("Amazon returned no products: page layout changed, captcha, or access blocked")
+        raise RuntimeError(why_empty("Amazon"))
     return list(seen.values())
