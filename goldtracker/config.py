@@ -54,12 +54,19 @@ class Settings:
     amazon_api_base: str = field(
         default_factory=lambda: os.getenv("AMAZON_API_BASE", "https://creatorsapi.amazon/catalog/v1/").strip())
     amazon_marketplace: str = field(default_factory=lambda: os.getenv("AMAZON_MARKETPLACE", "www.amazon.in").strip())
+    # Which retailers to collect; Amazon uses the Creators API when keys are set, otherwise the browser
+    retailers: list[str] = field(default_factory=lambda: _list("RETAILERS", "myntra,ajio,flipkart,amazon"))
+    amazon_source: str = field(default_factory=lambda: os.getenv("AMAZON_SOURCE", "auto").strip().lower())
     amazon_keywords: list[str] = field(
         default_factory=lambda: _list("AMAZON_KEYWORDS", "24k gold coin,gold bar 999,22k gold coin"))
 
     telegram_token: str = field(default_factory=lambda: os.getenv("TELEGRAM_BOT_TOKEN", "").strip())
     telegram_chat_id: str = field(default_factory=lambda: os.getenv("TELEGRAM_CHAT_ID", "").strip())
     alert_below: float | None = field(default_factory=lambda: _float("ALERT_BELOW_PER_FINE_G"))
+
+    @property
+    def amazon_api_ready(self) -> bool:
+        return bool(self.amazon_client_id and self.amazon_client_secret and self.amazon_partner_tag)
 
     def refresh_minutes_for(self, retailer: str) -> int:
         """Per-retailer interval, e.g. REFRESH_MINUTES_MYNTRA=15; falls back to REFRESH_MINUTES."""

@@ -24,21 +24,43 @@ log = logging.getLogger("goldtracker")
 
 COLLECTORS = {
     "myntra": "goldtracker.collectors.myntra",
-    "amazon": "goldtracker.collectors.amazon",
+    "ajio": "goldtracker.collectors.ajio",
+    "flipkart": "goldtracker.collectors.flipkart",
+    "amazon": "goldtracker.collectors.amazon",          # official Creators API
+    "amazon_web": "goldtracker.collectors.amazon_web",  # browser fallback
 }
+RETAILERS = ["myntra", "ajio", "flipkart", "amazon"]
 
 
 def enabled_retailers(settings: Settings) -> list[str]:
-    """Myntra always; Amazon only once Creators API keys are configured."""
-    out = ["myntra"]
-    if settings.amazon_client_id and settings.amazon_client_secret and settings.amazon_partner_tag:
-        out.append("amazon")
+    """RETAILERS from settings. Amazon is skipped only if AMAZON_SOURCE=api and no keys are set."""
+    out = []
+    for r in settings.retailers:
+        if r not in RETAILERS:
+            log.warning("unknown retailer %r in RETAILERS (known: %s)", r, ", ".join(RETAILERS))
+            continue
+        if r == "amazon" and settings.amazon_source == "api" and not settings.amazon_api_ready:
+            continue
+        out.append(r)
     return out
 
 
+def amazon_module(settings: Settings) -> str:
+    """'api' or 'browser' force a source; 'auto' uses the API when keys are set, else the browser."""
+    if settings.amazon_source == "browser":
+        return "amazon_web"
+    if settings.amazon_source == "api" or settings.amazon_api_ready:
+        return "amazon"
+    return "amazon_web"
+
+
 def run_collector(name: str, settings: Settings | None = None) -> list:
-    mod = importlib.import_module(COLLECTORS[name])
-    return mod.collect(settings) if name == "amazon" else mod.collect()
+    settings = settings or get_settings()
+    if name == "amazon":
+        key = amazon_module(settings)
+        mod = importlib.import_module(COLLECTORS[key])
+        return mod.collect(settings) if key == "amazon" else mod.collect()
+    return importlib.import_module(COLLECTORS[name]).collect()
 
 
 def refresh_rates_job(settings: Settings | None = None) -> dict:

@@ -23,7 +23,7 @@ def main(argv: list[str] | None = None) -> None:
     i.add_argument("path")
 
     c = sub.add_parser("collect", help="run a retailer collector")
-    c.add_argument("retailer", choices=["myntra", "amazon"])
+    c.add_argument("retailer", choices=["myntra", "ajio", "flipkart", "amazon"])
     c.add_argument("--dry-run", action="store_true", help="print what was found, don't save")
 
     k = sub.add_parser("rank", help="print the top deals")

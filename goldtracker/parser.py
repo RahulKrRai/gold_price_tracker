@@ -25,10 +25,10 @@ MG_RE = re.compile(r"(?<![\d.])(\d+(?:\.\d+)?)\s*(?:mg|milligrams?)(?![a-z])", r
 EACH_RE = re.compile(rf"{_NUM}\s*{_UNIT}\s*each", re.I)
 COUNT_RE = re.compile(r"(?:(?:pack|set)\s*of\s*(\d+))|(?:x\s*(\d+)\s*(?:pcs?|pieces?|nos?)?)", re.I)
 
-FINENESS_RE = re.compile(r"(?<![\d.])(999\.9|999|995|916|750|585)(?![\d])")
+FINENESS_RE = re.compile(r"(?<![\d.])(999\.9|9999|999|995|916|750|585)(?![\d])")
 KARAT_RE = re.compile(r"(?<![\d.])(24|23|22|18|14)\s*(?:k|kt|kts|karat|carat|ct)(?![a-z])", re.I)
 
-FINENESS_TO_PURITY = {"999.9": 0.9999, "999": 0.999, "995": 0.995, "916": 0.916, "750": 0.75, "585": 0.585}
+FINENESS_TO_PURITY = {"999.9": 0.9999, "9999": 0.9999, "999": 0.999, "995": 0.995, "916": 0.916, "750": 0.75, "585": 0.585}
 KARAT_TO_PURITY = {"24": 0.999, "23": 0.958, "22": 0.916, "18": 0.75, "14": 0.585}
 
 EXCLUDE_RE = re.compile(
