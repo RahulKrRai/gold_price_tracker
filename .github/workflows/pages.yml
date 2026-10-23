@@ -35,6 +35,7 @@ jobs:
     env:
       GOLD_DB_PATH: data/gold.db
       PUBLISH_DIR: site
+      GOLD_DIAG_DIR: diag   # screenshots of pages that returned no products
       MY_OFFERS: ${{ vars.MY_OFFERS || 'sbi-card,cb-1350-29k' }}
       RETAILERS: ${{ vars.RETAILERS || 'myntra,ajio,flipkart,amazon' }}
     steps:
@@ -73,6 +74,7 @@ jobs:
           path: |
             data/gold.db
             run-report.json
+            diag/
           retention-days: 14
 
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
