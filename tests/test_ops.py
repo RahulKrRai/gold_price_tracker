@@ -40,14 +40,15 @@ def test_scheduler_jobs(monkeypatch):
     sched = jobs.build_scheduler(Settings(), scheduler_cls=BackgroundScheduler)
     ids = {j.id: j for j in sched.get_jobs()}
     assert set(ids) == {"rates-11:00", "rates-17:00", "prices-myntra", "prices-ajio", "prices-flipkart",
-                        "prices-amazon"}
+                        "prices-amazon", "prices-tatacliq", "prices-coinbazaar", "prices-zepto"}
     assert ids["prices-myntra"].trigger.interval.total_seconds() == 15 * 60
     nxt = ids["rates-11:00"].trigger.get_next_fire_time(None, datetime(2026, 10, 17, 12, 0, tzinfo=IST))  # Saturday
     assert (nxt.weekday(), nxt.hour, nxt.minute) == (0, 11, 0)  # next is Monday 11:00
 
 
 def test_amazon_source_routing(monkeypatch):
-    assert jobs.enabled_retailers(Settings()) == ["myntra", "ajio", "flipkart", "amazon"]
+    assert jobs.enabled_retailers(Settings()) == ["myntra", "ajio", "flipkart", "amazon", "tatacliq",
+                                                 "coinbazaar", "zepto"]
     assert jobs.amazon_module(Settings()) == "amazon_web"          # auto, no keys -> browser
     for k in ("AMAZON_CLIENT_ID", "AMAZON_CLIENT_SECRET", "AMAZON_PARTNER_TAG"):
         monkeypatch.setenv(k, "x")
@@ -235,3 +236,22 @@ def test_run_once_survives_blocked_retailers(tmp_path, monkeypatch):
     assert report["publish"]["deals"] > 0 and (tmp_path / "site" / "data" / "deals.json").exists()
     md = summary.read_text()
     assert "| flipkart | ❌" in md and "| myntra | ✅ 109 listings" in md
+
+
+def test_freshness_rows(tmp_path, monkeypatch):
+    from goldtracker import db
+    from goldtracker.config import Settings
+    from goldtracker.status import freshness
+    monkeypatch.delenv("GOLD_RATE_SOURCES", raising=False)
+    conn = db.connect(tmp_path / "g.db")
+    db.init_db(conn)
+    db.save_rate(conn, 14248, "ibja", as_of="2026-10-23T12:00:00+05:30")
+    run = db.start_run(conn, "rates")
+    db.finish_run(conn, run, ok=True, count=1, error="tanishq: HTTPStatusError: 403 Forbidden")
+    run = db.start_run(conn, "myntra")
+    db.finish_run(conn, run, ok=False, error="RuntimeError: Myntra returned no products: blocked")
+    rows = {r["id"]: r for r in freshness(conn, Settings())}
+    assert rows["ibja"]["ok"] and rows["ibja"]["as_of"] == "2026-10-23T12:00:00+05:30"
+    assert not rows["tanishq"]["ok"] and "403" in rows["tanishq"]["error"]
+    assert "goodreturns" not in rows  # never fetched, never failed
+    assert rows["myntra"]["kind"] == "retailer" and not rows["myntra"]["ok"] and "blocked" in rows["myntra"]["error"]
