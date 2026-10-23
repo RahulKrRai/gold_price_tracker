@@ -86,6 +86,12 @@
           border: 1px solid #f0d48a; }
   @media (prefers-color-scheme: dark) { .warn { background: #3a2f12; color: #f3d48b; border-color: #6b5520; } }
   .warn + .warn { margin-top: 6px; }
+  .fresh { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; font-size: 12px; }
+  .fresh span { background: var(--chip); border-radius: 999px; padding: 3px 10px; color: var(--muted); }
+  .fresh span::before { content: "●"; margin-right: 5px; color: var(--good); }
+  .fresh span.old::before { color: var(--gold); }
+  .fresh span.fail { color: var(--bad); } .fresh span.fail::before { color: var(--bad); }
+  .fresh b { color: var(--ink); font-weight: 600; }
   .sharebtn { background: none; border: 0; color: var(--muted); font-size: 12px; padding: 0; margin-left: 6px; text-decoration: underline; }
   details.review { margin-top: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
   details.review summary { cursor: pointer; font-weight: 600; }
@@ -109,6 +115,7 @@
     </div>
     <div class="rates" id="rates"><div class="rate">24K rate: —</div></div>
   </header>
+  <div class="fresh" id="fresh" aria-label="Last refreshed per source"></div>
   <div id="warnings"></div>
 
   <section class="panel" aria-label="Filters">
@@ -252,7 +259,7 @@ async function loadMeta() {
   $("#warnings").innerHTML = (META.warnings || []).map(w => `<div class="warn" role="status">⚠ ${esc(w.message)}</div>`).join("");
   const syncText = () => $("#sync").textContent = "Prices synced " + ago(META.last_sync) +
     (STATIC ? " · read-only snapshot" : "");
-  syncText(); setInterval(syncText, 60000);
+  syncText(); renderFresh(); setInterval(() => { syncText(); renderFresh(); }, 60000);
   if (STATIC) {
     $("#refresh").hidden = true;
     $("#paywith").innerHTML = `<p class="meta">Offers applied: ${esc(META.offers.filter(o => META.my_offers.includes(o.id) || o.public)
@@ -277,6 +284,20 @@ async function loadMeta() {
   if (state.wallet) $("#w-pct").value = state.wallet;
   const syncWallet = () => { state.wallet = $("#w-on").checked ? $("#w-pct").value : ""; loadDeals(); };
   $("#w-on").onchange = syncWallet; $("#w-pct").onchange = () => { if ($("#w-on").checked) syncWallet(); };
+}
+
+// "Flipkart · 12 min ago" per retailer and rate source; red when the last try failed,
+// amber when prices are over 3 hours old (rates: over a day, since IBJA publishes twice a day).
+function renderFresh() {
+  const rows = META.freshness || [];
+  $("#fresh").innerHTML = rows.map(f => {
+    const age = f.as_of ? (Date.now() - new Date(f.as_of)) / 60000 : Infinity;
+    const cls = !f.ok ? "fail" : age > (f.kind === "rate" ? 26 * 60 : 180) ? "old" : "";
+    const what = f.kind === "rate" ? "rate " : "";
+    const state = !f.ok ? (f.as_of ? `failing · last ok ${ago(f.as_of)}` : "failing") : ago(f.as_of);
+    const tip = [f.error, f.checked_at ? "checked " + ago(f.checked_at) : ""].filter(Boolean).join(" · ");
+    return `<span class="${cls}" title="${esc(tip)}"><b>${esc(what + f.label)}</b> · ${esc(state)}</span>`;
+  }).join("");
 }
 
 function fmtAsOf(r) {
