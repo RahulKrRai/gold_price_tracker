@@ -133,13 +133,23 @@ Every run is logged in the `runs` table (`/api/runs`), which drives the dashboar
 | Flipkart | Browser; reads product cards (`[data-id]`) on search pages | No embedded data; class names change often, so only ids, links and text are used |
 | Amazon | Creators API when keys are set; otherwise the browser (search result cards) | `AMAZON_SOURCE=auto|api|browser`. Prefer the API: Amazon's terms prohibit automated data gathering |
 
-Choose retailers with `RETAILERS=myntra,ajio,flipkart,amazon`. All browser collectors open one page at a time with a pause between pages. Retailers' terms restrict automated access, so keep it to personal use at low frequency, and run it on your own computer: these sites refuse cloud servers.
+Choose retailers with `RETAILERS=myntra,ajio,flipkart,amazon`. All browser collectors open one page at a time with a pause between pages. Retailers' terms restrict automated access, so keep it to personal use at low frequency. Some retailers may block cloud servers; a blocked retailer is skipped and reported, it never stops a run.
 
 ## Amazon
 
 Amazon replaced the Product Advertising API with the **Creators API** on 30 April 2026. `collectors/amazon.py` uses it (OAuth client credentials, `searchItems`). It needs an approved Amazon Associates account: put the keys in `.env` (`AMAZON_CLIENT_ID`, `AMAZON_CLIENT_SECRET`, `AMAZON_PARTNER_TAG`, `AMAZON_CREDENTIAL_VERSION`), then run `python -m goldtracker collect amazon --dry-run`. The scheduler only adds the Amazon job once keys are set. It is tested against a mock server only, so check the first real run.
 
-## Public site (GitHub Pages)
+## Free hosting (GitHub Actions + GitHub Pages)
+
+`.github/workflows/pages.yml` runs `python -m goldtracker run-once` on GitHub's servers every 2 hours: it fetches rates, collects every retailer, sends alerts and publishes the read-only dashboard to GitHub Pages. Nothing runs on your computer and no long-lived key is stored.
+
+1. **Settings → Pages → Source: GitHub Actions** (one time).
+2. Optional: **Settings → Secrets and variables → Actions**: secrets `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `AMAZON_*`; variables `MY_OFFERS`, `ALERT_BELOW_PER_FINE_G`, `RETAILERS`.
+3. **Actions → collect-and-publish → Run workflow** for a first run. Each run's page shows a table of which rates and retailers worked.
+
+Security: actions are pinned to commit SHAs; the default token is read-only and only the deploy job can write to Pages; secrets reach only the collect step on scheduled/manual runs; price history is kept in the Actions cache (and a 14-day artifact), never committed. `tests.yml` also runs a gitleaks secret scan on every push. Note: GitHub pauses scheduled workflows in public repos after 60 days without repo activity; re-enable them from the Actions tab.
+
+## Public site (manual publish)
 
 ```bash
 python -m goldtracker publish          # writes site/: the dashboard in read-only mode + data/*.json
