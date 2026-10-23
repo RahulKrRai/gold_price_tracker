@@ -103,16 +103,20 @@ The SBI slab thresholds in the sample file are estimates from one sale; check th
 
 ## Gold rate
 
-`GOLD_RATE_SOURCES=ibja,tanishq` (default). The first source with a rate is the benchmark for "vs market"; the others are shown alongside.
+`GOLD_RATE_SOURCES=ibja,tanishq,goodreturns,xau` (default). The first source with a rate is the benchmark for "vs market"; the others are shown alongside.
 
 | Source | What it is | Where it comes from |
 |---|---|---|
 | `ibja` | Official India Bullion & Jewellers Association rate, weekdays, AM and PM sessions | ibjarates.com, plain HTML (rates per 10 g, converted to per gram) |
-| `tanishq` | Tanishq's published retail rate (the rate WealthyDimes shows) | tanishq.co.in/gold-rate.html, plain HTML |
+| `tanishq` | Tanishq's published retail rate | tanishq.co.in/gold-rate.html, plain HTML |
+| `goodreturns` | GoodReturns' daily India rate (24K and 22K per gram) | goodreturns.in/gold-rates/, plain HTML |
+| `xau` | International spot (XAU) in INR per gram, **without import duty or GST** | api.gold-api.com, free JSON, no key |
 | `manual` | `GOLD_RATE_24K` in `.env`, or `rate --set` | you |
 | `url` | Any JSON endpoint: `GOLD_RATE_URL` + `GOLD_RATE_JSON_KEY` (dot path) | you |
 
 IBJA is the wholesale reference and is about 1% below jewellers' retail rates, so premiums against IBJA read about 1% higher than against Tanishq. If a source fails, its last stored rate is kept and the dashboard warns once it is more than one weekday old.
+
+`xau` reads about 15% below Indian rates because it has no import duty or GST. It is shown in the header for context only and is left out of the per-row "vs" figures. MCX futures are not included: mcxindia.com blocks scripted access and its terms forbid reusing its data.
 
 ## Scheduler
 
@@ -132,8 +136,13 @@ Every run is logged in the `runs` table (`/api/runs`), which drives the dashboar
 | Ajio | Browser; reads `window.__PRELOADED_STATE__.grid.entities` on search pages | Listings only say "Coupon Applicable"; add known Ajio coupons with `sale-coupon` |
 | Flipkart | Browser; reads product cards (`[data-id]`) on search pages | No embedded data; class names change often, so only ids, links and text are used |
 | Amazon | Creators API when keys are set; otherwise the browser (search result cards) | `AMAZON_SOURCE=auto|api|browser`. Prefer the API: Amazon's terms prohibit automated data gathering |
+| Tata CLiQ | Browser; reads product cards (links to `/p-mp…`) and clicks "Show More Products" | Prices include GST |
+| CoinBazaar | Plain HTTP: the PrestaShop category returns JSON when asked with `Accept: application/json` | No browser needed; out-of-stock items have no add-to-cart link |
+| Zepto | Browser; reads search cards (links to `/pvid/…`) | Zepto's default store (no delivery location set), so prices can differ by area |
 
-Choose retailers with `RETAILERS=myntra,ajio,flipkart,amazon`. All browser collectors open one page at a time with a pause between pages. Retailers' terms restrict automated access, so keep it to personal use at low frequency. Some retailers may block cloud servers; a blocked retailer is skipped and reported, it never stops a run.
+Swiggy Instamart is not included: its search shows nothing until a delivery location is chosen.
+
+Choose retailers with `RETAILERS=myntra,ajio,flipkart,amazon,tatacliq,coinbazaar,zepto`. All browser collectors open one page at a time with a pause between pages. Retailers' terms restrict automated access, so keep it to personal use at low frequency. Some retailers may block cloud servers; a blocked retailer is skipped and reported, it never stops a run.
 
 ## Amazon
 
@@ -141,11 +150,23 @@ Amazon replaced the Product Advertising API with the **Creators API** on 30 Apri
 
 ## Free hosting (GitHub Actions + GitHub Pages)
 
-`.github/workflows/pages.yml` runs `python -m goldtracker run-once` on GitHub's servers every 2 hours: it fetches rates, collects every retailer, sends alerts and publishes the read-only dashboard to GitHub Pages. Nothing runs on your computer and no long-lived key is stored.
+`.github/workflows/pages.yml` runs `python -m goldtracker run-once` on GitHub's servers every 30 minutes (at :07 and :37): it fetches rates, collects every retailer, sends alerts and publishes the read-only dashboard to GitHub Pages. Nothing runs on your computer and no long-lived key is stored.
 
 1. **Settings → Pages → Source: GitHub Actions** (one time).
 2. Optional: **Settings → Secrets and variables → Actions**: secrets `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `AMAZON_*`; variables `MY_OFFERS`, `ALERT_BELOW_PER_FINE_G`, `RETAILERS`.
 3. **Actions → collect-and-publish → Run workflow** for a first run. Each run's page shows a table of which rates and retailers worked.
+
+The dashboard shows a pill per rate source and retailer with when it last worked ("Flipkart · 12 min ago"); it turns red when the last try failed (hover for the error) and amber when prices are over 3 hours old.
+
+### Blocked retailers (Myntra, Ajio, Amazon, Tanishq)
+
+These sites refuse requests from cloud and datacenter networks, and GitHub's runners are datacenter machines. The run page shows them as "❌ … blocked"; this is not a bug in the collectors and retrying from GitHub won't change it. They work from an ordinary home connection in India. Two ways to use that:
+
+- **Collect on your computer:** `python -m goldtracker schedule` with `PUBLISH_GIT_PUSH=true` refreshes and pushes the site while your computer is on.
+- **Run this workflow on your computer** as a GitHub *self-hosted runner*: **Settings → Actions → Runners → New self-hosted runner**, follow the steps for your OS, then add the repository variable `COLLECT_RUNNER=self-hosted`. Runs then happen only while your computer is on and the runner is running; delete the variable to go back to GitHub's servers.
+  Before you do this on a public repo, set **Settings → Actions → General → Fork pull request workflows → Require approval for all external contributors**, so nobody else's pull request can run code on your computer.
+
+For Amazon, the Creators API (see below) works from GitHub's servers and is the better route.
 
 Security: actions are pinned to commit SHAs; the default token is read-only and only the deploy job can write to Pages; secrets reach only the collect step on scheduled/manual runs; price history is kept in the Actions cache (and a 14-day artifact), never committed. `tests.yml` also runs a gitleaks secret scan on every push. Note: GitHub pauses scheduled workflows in public repos after 60 days without repo activity; re-enable them from the Actions tab.
 
@@ -177,10 +198,11 @@ goldtracker/
   parser.py        weight, purity and form from product titles
   offers.py        coupon / card / cashback rules
   ranking.py       ₹ per fine gram and premium vs spot
-  rates.py         gold rates: IBJA, Tanishq, manual, URL; staleness
+  rates.py         gold rates: IBJA, Tanishq, GoodReturns, international spot, manual, URL; staleness
   db.py            SQLite: products, prices, gold_rates, runs, overrides (+ automatic upgrades)
   collectors/      csv_import.py, myntra.py, ajio.py, flipkart.py, amazon.py (Creators API),
-                   amazon_web.py (browser fallback), browser.py (shared Playwright helper)
+                   amazon_web.py (browser fallback), tatacliq.py, coinbazaar.py, zepto.py,
+                   browser.py (shared Playwright helper)
   jobs.py          rate and price jobs + scheduler
   status.py        dashboard header data: rates, sync times, warnings, review list
   publish.py       static site for GitHub Pages
@@ -194,6 +216,6 @@ tests/             pytest suite + fixtures/ (saved IBJA, Tanishq and Myntra page
 ## Caveats
 
 - Amazon and Myntra restrict automated access in their terms. Keep collection to personal use, at a low rate.
-- Myntra refuses connections from cloud servers, so the collector must run on your own computer. Its data format was checked in a real browser on 2026-10-16.
+- Myntra, Ajio, Amazon (browser) and Tanishq refuse connections from cloud servers, including GitHub Actions; see "Blocked retailers". Its data format was checked in a real browser on 2026-10-16.
 - The Amazon collector is untested against the real API until keys are available.
 - Coupons that only appear in the cart or apply only to a first order may not be reflected. Treat prices as estimates.
