@@ -208,3 +208,30 @@ def test_sale_coupon_cli(tmp_path, monkeypatch, capsys):
     assert saved[0]["public"] is True and saved[0]["flat"] == 750
     main(["sale-coupon", "remove", "BLINK750"])
     assert json.loads(p.read_text()) == []
+
+
+def test_run_once_survives_blocked_retailers(tmp_path, monkeypatch):
+    from goldtracker import rates as rates_mod
+    from goldtracker.__main__ import main
+
+    monkeypatch.setenv("GOLD_DB_PATH", str(tmp_path / "r.db"))
+    monkeypatch.setenv("PUBLISH_DIR", str(tmp_path / "site"))
+    monkeypatch.setenv("RETAILERS", "myntra,flipkart")
+    snapshot = read_csv(ROOT / "data" / "myntra_2026-10-16.csv")
+
+    def fake_collector(name, settings=None):
+        if name == "flipkart":
+            raise RuntimeError("Flipkart returned no products: access was blocked")
+        return snapshot
+    monkeypatch.setattr(jobs, "run_collector", fake_collector)
+    monkeypatch.setattr(rates_mod, "default_get", lambda url: (FIX / ("tanishq.html" if "tanishq" in url
+                                                                       else "ibja_weekday_am.html")).read_text())
+    summary = tmp_path / "summary.md"
+    main(["run-once", "--report", str(tmp_path / "report.json"), "--summary", str(summary)])
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert report["rates"]["ibja"]["ok"] and report["rates"]["tanishq"]["ok"]
+    assert report["retailers"]["myntra"]["saved"] == 109
+    assert "blocked" in report["retailers"]["flipkart"]["error"]
+    assert report["publish"]["deals"] > 0 and (tmp_path / "site" / "data" / "deals.json").exists()
+    md = summary.read_text()
+    assert "| flipkart | ❌" in md and "| myntra | ✅ 109 listings" in md
