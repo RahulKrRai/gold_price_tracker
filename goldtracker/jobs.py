@@ -75,7 +75,7 @@ def refresh_rates_job(settings: Settings | None = None) -> dict:
     return report
 
 
-def refresh_retailer(name: str, settings: Settings | None = None) -> dict:
+def refresh_retailer(name: str, settings: Settings | None = None, publish: bool = True) -> dict:
     settings = settings or get_settings()
     with db.open_db(settings.db_path) as conn:
         run = db.start_run(conn, name)
@@ -93,7 +93,8 @@ def refresh_retailer(name: str, settings: Settings | None = None) -> dict:
             result["alerts_sent"] = check_and_alert(conn, deals, settings)
         except Exception as e:
             log.warning("alert failed: %s", e)
-    _maybe_publish(settings)
+    if publish:
+        _maybe_publish(settings)
     log.info("%s: %s", name, result)
     return result
 
@@ -142,3 +143,36 @@ def run_scheduler(settings: Settings | None = None) -> None:
         log.info("scheduled %s: %s", job.id, job.trigger)
     refresh_once(settings)
     sched.start()
+
+
+def run_once(settings: Settings | None = None, publish_site: bool = True) -> dict:
+    """One full cycle for a scheduled job (e.g. GitHub Actions): rates, every enabled retailer,
+    then publish. A blocked or broken retailer is recorded and skipped; it never stops the run."""
+    settings = settings or get_settings()
+    report: dict = {"rates": refresh_rates_job(settings), "retailers": {}}
+    for name in enabled_retailers(settings):
+        try:
+            report["retailers"][name] = refresh_retailer(name, settings, publish=False)
+        except Exception as e:  # belt and braces: refresh_retailer already catches collector errors
+            report["retailers"][name] = {"error": f"{type(e).__name__}: {e}"}
+    if publish_site:
+        from .publish import publish
+        report["publish"] = publish(settings)
+    return report
+
+
+def report_markdown(report: dict) -> str:
+    """Human summary for the GitHub Actions run page."""
+    lines = ["## Gold Deal Tracker run", "", "| Source | Result |", "|---|---|"]
+    for src, r in report.get("rates", {}).items():
+        lines.append(f"| rate: {src} | " + (f"✅ ₹{r['rate_24k']:,.1f}/g as of {r['as_of']}" if r.get("ok")
+                                          else f"❌ {r.get('error', '')[:120]}") + " |")
+    for name, r in report.get("retailers", {}).items():
+        if "error" in r:
+            lines.append(f"| {name} | ❌ {str(r['error'])[:120]} |")
+        else:
+            lines.append(f"| {name} | ✅ {r.get('saved', 0)} listings saved, {r.get('unparsed', 0)} unparsed |")
+    pub = report.get("publish")
+    if pub:
+        lines += ["", f"Published {pub.get('deals', 0)} ranked deals."]
+    return "\n".join(lines) + "\n"

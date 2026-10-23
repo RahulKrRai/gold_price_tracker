@@ -62,6 +62,10 @@ def main(argv: list[str] | None = None) -> None:
     s = sub.add_parser("serve", help="start the dashboard")
     s.add_argument("--port", type=int, default=8000)
     sub.add_parser("schedule", help="keep refreshing rates and prices until stopped")
+    ro = sub.add_parser("run-once", help="one full cycle (rates, all retailers, publish) for scheduled jobs")
+    ro.add_argument("--report", help="write a JSON report here")
+    ro.add_argument("--summary", help="append a Markdown summary here (e.g. $GITHUB_STEP_SUMMARY)")
+    ro.add_argument("--no-publish", action="store_true")
     args = ap.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -187,6 +191,21 @@ def main(argv: list[str] | None = None) -> None:
         import uvicorn
 
         uvicorn.run("goldtracker.web.app:app", host="127.0.0.1", port=args.port)
+
+    elif args.cmd == "run-once":
+        import json as _json
+
+        from .jobs import report_markdown, run_once
+
+        report = run_once(settings, publish_site=not args.no_publish)
+        md = report_markdown(report)
+        print(md)
+        if args.report:
+            with open(args.report, "w", encoding="utf-8") as fh:
+                _json.dump(report, fh, indent=2, default=str)
+        if args.summary:
+            with open(args.summary, "a", encoding="utf-8") as fh:
+                fh.write(md)
 
     elif args.cmd == "schedule":
         from .jobs import run_scheduler

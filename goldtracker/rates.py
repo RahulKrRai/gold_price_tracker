@@ -139,8 +139,9 @@ def _dig(data, dotted: str):
     return data
 
 
-def fetch_source(source: str, settings: Settings, get: HttpGet = default_get,
+def fetch_source(source: str, settings: Settings, get: HttpGet | None = None,
                  today: date | None = None) -> Rate:
+    get = get or default_get
     today = today or datetime.now(IST).date()
     now = datetime.now(IST).isoformat(timespec="seconds")
     if source == "ibja":
@@ -167,7 +168,7 @@ def fetch_from_url(url: str, json_key: str, timeout: float = 15.0) -> float:
     return _check(float(_dig(resp.json(), json_key)), "URL rate")
 
 
-def refresh_rates(conn: sqlite3.Connection, settings: Settings, get: HttpGet = default_get,
+def refresh_rates(conn: sqlite3.Connection, settings: Settings, get: HttpGet | None = None,
                   today: date | None = None) -> dict[str, dict]:
     """Fetch every configured source; store what works, report what doesn't. Never raises."""
     report: dict[str, dict] = {}
