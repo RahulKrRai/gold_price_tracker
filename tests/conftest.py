@@ -19,6 +19,7 @@ def _clean_env(monkeypatch):
     # A developer's own .env must not leak into tests
     for k in ["GOLD_RATE_SOURCES", "REFRESH_MINUTES", "REFRESH_MINUTES_MYNTRA", "PUBLISH_DIR", "PUBLISH_GIT_PUSH",
               "AMAZON_CLIENT_ID", "AMAZON_CLIENT_SECRET", "AMAZON_PARTNER_TAG", "GOLD_RATE_24K",
-              "TELEGRAM_BOT_TOKEN", "ALERT_BELOW_PER_FINE_G"]:
+              "TELEGRAM_BOT_TOKEN", "ALERT_BELOW_PER_FINE_G", "RETAILERS", "AMAZON_SOURCE",
+              "AMAZON_CREDENTIAL_VERSION", "AMAZON_KEYWORDS"]:
         monkeypatch.delenv(k, raising=False)
     yield

@@ -39,17 +39,29 @@ def test_scheduler_jobs(monkeypatch):
     monkeypatch.setenv("REFRESH_MINUTES_MYNTRA", "15")
     sched = jobs.build_scheduler(Settings(), scheduler_cls=BackgroundScheduler)
     ids = {j.id: j for j in sched.get_jobs()}
-    assert set(ids) == {"rates-11:00", "rates-17:00", "prices-myntra"}  # no Amazon without keys
+    assert set(ids) == {"rates-11:00", "rates-17:00", "prices-myntra", "prices-ajio", "prices-flipkart",
+                        "prices-amazon"}
     assert ids["prices-myntra"].trigger.interval.total_seconds() == 15 * 60
     nxt = ids["rates-11:00"].trigger.get_next_fire_time(None, datetime(2026, 10, 17, 12, 0, tzinfo=IST))  # Saturday
     assert (nxt.weekday(), nxt.hour, nxt.minute) == (0, 11, 0)  # next is Monday 11:00
 
 
-def test_amazon_job_only_with_keys(monkeypatch):
-    assert jobs.enabled_retailers(Settings()) == ["myntra"]
+def test_amazon_source_routing(monkeypatch):
+    assert jobs.enabled_retailers(Settings()) == ["myntra", "ajio", "flipkart", "amazon"]
+    assert jobs.amazon_module(Settings()) == "amazon_web"          # auto, no keys -> browser
     for k in ("AMAZON_CLIENT_ID", "AMAZON_CLIENT_SECRET", "AMAZON_PARTNER_TAG"):
         monkeypatch.setenv(k, "x")
-    assert jobs.enabled_retailers(Settings()) == ["myntra", "amazon"]
+    assert jobs.amazon_module(Settings()) == "amazon"              # auto, keys -> official API
+    monkeypatch.setenv("AMAZON_SOURCE", "browser")
+    assert jobs.amazon_module(Settings()) == "amazon_web"          # forced
+
+
+def test_retailers_setting(monkeypatch):
+    monkeypatch.setenv("RETAILERS", "myntra,flipkart,nykaa")
+    assert jobs.enabled_retailers(Settings()) == ["myntra", "flipkart"]   # unknown ones skipped
+    monkeypatch.setenv("RETAILERS", "amazon")
+    monkeypatch.setenv("AMAZON_SOURCE", "api")
+    assert jobs.enabled_retailers(Settings()) == []                        # api forced but no keys
 
 
 def test_failed_run_is_logged_and_warned(tmp_path, monkeypatch):
