@@ -57,6 +57,11 @@ def spot_per_fine_gram(rate_24k: float) -> float:
     return rate_24k / 0.999
 
 
+# Shown in the header for context but left out of per-row premiums (international spot has no
+# import duty, so every deal would look ~20% "over market" against it)
+REFERENCE_ONLY = {"xau"}
+
+
 def rank(conn: sqlite3.Connection, offers: list[Offer], *, held: set[str] | None = None,
          include_first_order: bool = False, retailer: str | None = None, weight_g: float | None = None,
          purity: float | None = None, form: str | None = None, in_stock_only: bool = True,
@@ -68,7 +73,8 @@ def rank(conn: sqlite3.Connection, offers: list[Offer], *, held: set[str] | None
     against every other stored source are reported in `premiums`."""
     rate_row = db.benchmark_rate(conn, rate_sources or [])
     spot = spot_per_fine_gram(rate_row["rate_24k"]) if rate_row else None
-    others = {src: spot_per_fine_gram(row["rate_24k"]) for src, row in db.latest_rates(conn).items()}
+    others = {src: spot_per_fine_gram(row["rate_24k"]) for src, row in db.latest_rates(conn).items()
+              if src not in REFERENCE_ONLY or src == (rate_row["source"] if rate_row else None)}
     stats = db.price_stats(conn)
     deals: list[RankedDeal] = []
     for r in db.latest_listings(conn):

@@ -33,7 +33,8 @@ KARAT_TO_PURITY = {"24": 0.999, "23": 0.958, "22": 0.916, "18": 0.75, "14": 0.58
 
 EXCLUDE_RE = re.compile(
     r"\b(plated|gold[- ]?plated|gold[- ]?toned|imitation|covering|one gram gold|silver coin|silver bar|brass|"
-    r"diamond[- ]studded|studded|necklace|chain|earrings?)\b", re.I)
+    r"diamond[- ]studded|studded|necklace|chain|earrings?|silver|artificial|rakhi)\b", re.I)
+HALF_RE = re.compile(r"\bhalf\s*(?:a\s*)?(?:grams?|gms?|g)\b", re.I)
 
 
 @dataclass(frozen=True)
@@ -73,6 +74,8 @@ def _weight_from(text: str) -> float | None:
     found = WEIGHT_RE.findall(text)
     if found:
         return float(found[0])
+    if HALF_RE.search(text):  # "Gold coin of 0.5 / Half Grams"
+        return 0.5
     return None
 
 

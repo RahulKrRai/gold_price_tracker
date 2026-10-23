@@ -10,6 +10,14 @@ Both pages are plain HTML (checked 2026-10-19):
   * tanishq.co.in/gold-rate.html: history rows
     <td>DD-MM-YYYY</td> ... data-goldrate22kt="13610" data-goldrate24kt="14847" (INR per gram)
 
+  * goodreturns.in/gold-rates/ (checked 2026-10-23): <span id="24K-price">&#x20b9;14,248</span>,
+    <span id="22K-price">...</span> and <span id="metal-price-date">23 October 2026</span> (INR per gram)
+  * api.gold-api.com/price/XAU/INR (free, no key): {"price": <INR per troy ounce>, "updatedAt": "...Z"}.
+    International spot converted to INR per gram. It has no Indian import duty or GST, so it reads
+    about 15% below Indian rates; it is shown for reference and is never a good benchmark.
+
+MCX futures are not included: mcxindia.com blocks scripted access and its data terms forbid reuse.
+
 Rates exclude GST. If a source fails, the last stored rate for it is kept.
 """
 
@@ -28,9 +36,12 @@ from .config import Settings
 
 IST = timezone(timedelta(hours=5, minutes=30))
 SESSION_TIME = {"AM": time(12, 0), "PM": time(17, 0)}  # IBJA publishes around noon and 5 pm
-UA = "Mozilla/5.0 (compatible; gold-deal-tracker/0.5; personal use)"
+UA = "Mozilla/5.0 (compatible; gold-deal-tracker/0.6; personal use)"
 IBJA_URL = "https://ibjarates.com/"
 TANISHQ_URL = "https://www.tanishq.co.in/gold-rate.html"
+GOODRETURNS_URL = "https://www.goodreturns.in/gold-rates/"
+XAU_URL = "https://api.gold-api.com/price/XAU/INR"
+TROY_OUNCE_G = 31.1034768
 
 
 @dataclass(frozen=True)
@@ -122,6 +133,39 @@ def parse_tanishq(html: str) -> Rate:
     return Rate("tanishq", _check(vals["24"], "Tanishq 24K"), vals.get("22"), _iso(d, time(10, 0)))
 
 
+# --- GoodReturns --------------------------------------------------------------------------
+
+_GR_PRICE = re.compile(r'id="(24|22)K-price"[^>]*>\s*(?:&#x20b9;|&#8377;|₹|Rs\.?)?\s*([\d,]+(?:\.\d+)?)', re.I)
+_GR_DATE = re.compile(r'id="metal-price-date"[^>]*>\s*(\d{1,2} [A-Za-z]+ \d{4})', re.I)
+
+
+def parse_goodreturns(html: str, today: date) -> Rate:
+    """Today's 24K/22K rate per gram from GoodReturns' price cards."""
+    vals = {k: _num(v) for k, v in _GR_PRICE.findall(html)}
+    if "24" not in vals:
+        raise RateError("GoodReturns page had no 24K rate (layout changed?)")
+    m = _GR_DATE.search(html)
+    d = datetime.strptime(m.group(1), "%d %B %Y").date() if m else today
+    # GoodReturns updates its rate in the morning; date-only, so stamp it 10:00 IST like Tanishq
+    return Rate("goodreturns", _check(vals["24"], "GoodReturns 24K"), vals.get("22"), _iso(d, time(10, 0)))
+
+
+# --- International spot (XAU) -------------------------------------------------------------
+
+def parse_xau(text: str) -> Rate:
+    """gold-api.com XAU priced in INR per troy ounce -> INR per gram (no duty, no GST)."""
+    import json
+
+    data = json.loads(text)
+    if (data.get("currency") or "").upper() != "INR" or not data.get("price"):
+        raise RateError(f"gold-api.com returned no INR price: {text[:120]}")
+    per_g = float(data["price"]) / TROY_OUNCE_G
+    as_of = data.get("updatedAt")
+    as_of = (datetime.fromisoformat(as_of.replace("Z", "+00:00")).astimezone(IST).isoformat(timespec="seconds")
+             if as_of else datetime.now(IST).isoformat(timespec="seconds"))
+    return Rate("xau", _check(round(per_g, 2), "XAU per gram"), round(per_g * 0.916, 2), as_of)
+
+
 # --- providers ----------------------------------------------------------------------------
 
 HttpGet = Callable[[str], str]
@@ -148,6 +192,10 @@ def fetch_source(source: str, settings: Settings, get: HttpGet | None = None,
         return parse_ibja(get(IBJA_URL), today)
     if source == "tanishq":
         return parse_tanishq(get(TANISHQ_URL))
+    if source == "goodreturns":
+        return parse_goodreturns(get(GOODRETURNS_URL), today)
+    if source == "xau":
+        return parse_xau(get(XAU_URL))
     if source == "url":
         if not (settings.rate_url and settings.rate_json_key):
             raise RateError("GOLD_RATE_URL and GOLD_RATE_JSON_KEY must be set for the 'url' source")
