@@ -15,7 +15,7 @@ from __future__ import annotations
 from urllib.parse import quote
 
 from .base import RawListing
-from .browser import browse, money
+from .browser import browse, money, why_empty
 
 QUERIES = ["gold coin", "gold bar 24k"]
 PAGES_PER_QUERY = 3
@@ -74,5 +74,5 @@ def collect(headless: bool = True) -> list[RawListing]:
         for it in parse(items):
             seen.setdefault(it.retailer_sku, it)
     if not seen:
-        raise RuntimeError("Ajio returned no products: page layout changed or access was blocked")
+        raise RuntimeError(why_empty("Ajio"))
     return list(seen.values())
