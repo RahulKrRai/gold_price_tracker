@@ -103,3 +103,15 @@ def test_all_four_retailers_rank_together():
     deals = rank(c, [])
     assert {d.retailer for d in deals} == {"ajio", "flipkart", "amazon"}
     assert [d.per_fine_g for d in deals] == sorted(d.per_fine_g for d in deals)
+
+
+def test_why_empty_explains_blocks_and_layout_changes():
+    from goldtracker.collectors import browser
+
+    browser.LAST_PAGES[:] = [{"status": 403, "title": "Access Denied", "snippet": "You don't have permission"}]
+    msg = browser.why_empty("Myntra")
+    assert "refused the request" in msg and "HTTP 403" in msg and "Access Denied" in msg
+    browser.LAST_PAGES[:] = [{"status": 200, "title": "Gold Coins - Buy online", "snippet": "Filters Sort by"}]
+    assert "layout changed" in browser.why_empty("Ajio")
+    browser.LAST_PAGES.clear()
+    assert "access was blocked" in browser.why_empty("Amazon")
