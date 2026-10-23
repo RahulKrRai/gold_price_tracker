@@ -112,15 +112,20 @@ def collect(headless: bool = True) -> list[RawListing]:
         raise SystemExit("Playwright is not installed. Run: pip install playwright && "
                          "python -m playwright install chromium") from e
 
+    from .browser import LAST_PAGES, note_page, why_empty
+
     pages: list[list[RawListing]] = []
+    LAST_PAGES.clear()
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=headless)
         page = browser.new_page(locale="en-IN")
         for base in SEARCH_URLS:
             for n in range(1, MAX_PAGES_PER_QUERY + 1):
-                page.goto(base if n == 1 else f"{base}?p={n}", wait_until="domcontentloaded", timeout=45000)
+                url = base if n == 1 else f"{base}?p={n}"
+                response = page.goto(url, wait_until="domcontentloaded", timeout=45000)
                 page.wait_for_timeout(3000)
                 listings, has_next = parse_results(page.evaluate(_STATE_JS))
+                note_page(page, response, url, empty=not listings)
                 pages.append(listings)
                 time.sleep(PAUSE_SECONDS)
                 if not has_next:
@@ -128,5 +133,5 @@ def collect(headless: bool = True) -> list[RawListing]:
         browser.close()
     items = merge(pages)
     if not items:
-        raise RuntimeError("Myntra returned no products: page layout changed or access was blocked")
+        raise RuntimeError(why_empty("Myntra"))
     return items
