@@ -33,7 +33,7 @@ python -m goldtracker serve                         # dashboard at http://127.0.
 Collecting live prices:
 
 ```bash
-python -m goldtracker collect myntra --dry-run      # check what it finds first
+python -m goldtracker collect myntra --dry-run      # check what it finds first (also: ajio, flipkart, amazon)
 python -m goldtracker collect myntra                # save to the database
 python -m goldtracker schedule                      # keep refreshing (see "Scheduler" below)
 ```
@@ -124,6 +124,17 @@ IBJA is the wholesale reference and is about 1% below jewellers' retail rates, s
 
 Every run is logged in the `runs` table (`/api/runs`), which drives the dashboard warnings.
 
+## Retailers
+
+| Retailer | How it's collected | Notes |
+|---|---|---|
+| Myntra | Browser; reads `window.__myx` on listing pages | Listing coupons (e.g. BFF500) and stock counts included |
+| Ajio | Browser; reads `window.__PRELOADED_STATE__.grid.entities` on search pages | Listings only say "Coupon Applicable"; add known Ajio coupons with `sale-coupon` |
+| Flipkart | Browser; reads product cards (`[data-id]`) on search pages | No embedded data; class names change often, so only ids, links and text are used |
+| Amazon | Creators API when keys are set; otherwise the browser (search result cards) | `AMAZON_SOURCE=auto|api|browser`. Prefer the API: Amazon's terms prohibit automated data gathering |
+
+Choose retailers with `RETAILERS=myntra,ajio,flipkart,amazon`. All browser collectors open one page at a time with a pause between pages. Retailers' terms restrict automated access, so keep it to personal use at low frequency, and run it on your own computer: these sites refuse cloud servers.
+
 ## Amazon
 
 Amazon replaced the Product Advertising API with the **Creators API** on 30 April 2026. `collectors/amazon.py` uses it (OAuth client credentials, `searchItems`). It needs an approved Amazon Associates account: put the keys in `.env` (`AMAZON_CLIENT_ID`, `AMAZON_CLIENT_SECRET`, `AMAZON_PARTNER_TAG`, `AMAZON_CREDENTIAL_VERSION`), then run `python -m goldtracker collect amazon --dry-run`. The scheduler only adds the Amazon job once keys are set. It is tested against a mock server only, so check the first real run.
@@ -158,7 +169,8 @@ goldtracker/
   ranking.py       ₹ per fine gram and premium vs spot
   rates.py         gold rates: IBJA, Tanishq, manual, URL; staleness
   db.py            SQLite: products, prices, gold_rates, runs, overrides (+ automatic upgrades)
-  collectors/      csv_import.py, myntra.py, amazon.py (Creators API)
+  collectors/      csv_import.py, myntra.py, ajio.py, flipkart.py, amazon.py (Creators API),
+                   amazon_web.py (browser fallback), browser.py (shared Playwright helper)
   jobs.py          rate and price jobs + scheduler
   status.py        dashboard header data: rates, sync times, warnings, review list
   publish.py       static site for GitHub Pages
