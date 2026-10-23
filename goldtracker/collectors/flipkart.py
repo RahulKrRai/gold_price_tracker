@@ -13,7 +13,7 @@ import re
 from urllib.parse import quote
 
 from .base import RawListing
-from .browser import browse, money
+from .browser import browse, money, why_empty
 
 QUERIES = ["gold coin 24k", "gold coin 22k", "gold bar"]
 PAGES_PER_QUERY = 3
@@ -70,5 +70,5 @@ def collect(headless: bool = True) -> list[RawListing]:
         for it in parse(cards):
             seen.setdefault(it.retailer_sku, it)
     if not seen:
-        raise RuntimeError("Flipkart returned no products: page layout changed or access was blocked")
+        raise RuntimeError(why_empty("Flipkart"))
     return list(seen.values())
