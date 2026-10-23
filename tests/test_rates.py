@@ -134,3 +134,50 @@ def test_old_database_is_upgraded(tmp_path):
 ])
 def test_rate_staleness(as_of, now, stale):
     assert rate_is_stale(as_of, now) is stale
+
+
+# --- GoodReturns and international spot (added 2026-10-23) -----------------------------------
+
+def test_goodreturns_today():
+    from goldtracker.rates import parse_goodreturns
+    r = parse_goodreturns(html("goodreturns.html"), today=date(2026, 10, 23))
+    assert (r.source, r.rate_24k, r.rate_22k) == ("goodreturns", 14248, 13060)
+    assert r.as_of == "2026-10-23T10:00:00+05:30"
+
+
+def test_goodreturns_layout_change_raises():
+    from goldtracker.rates import parse_goodreturns
+    with pytest.raises(RateError):
+        parse_goodreturns("<html>new layout</html>", today=date(2026, 10, 23))
+
+
+def test_xau_converts_troy_ounce_to_gram():
+    from goldtracker.rates import parse_xau
+    body = ('{"currency":"INR","currencySymbol":"\\u20b9","exchangeRate":94.8964,"name":"Gold",'
+            '"price":379955.6866601528,"symbol":"XAU","updatedAt":"2026-10-23T15:53:44Z"}')
+    r = parse_xau(body)
+    assert r.source == "xau" and r.rate_24k == pytest.approx(12215.86, abs=0.01)
+    assert r.as_of == "2026-10-23T21:23:44+05:30"
+
+
+def test_xau_wrong_currency_raises():
+    from goldtracker.rates import parse_xau
+    with pytest.raises(RateError):
+        parse_xau('{"currency":"USD","price":4003.9}')
+
+
+def test_default_sources_include_new_ones(monkeypatch):
+    monkeypatch.delenv("GOLD_RATE_SOURCES", raising=False)
+    assert Settings().rate_sources == ["ibja", "tanishq", "goodreturns", "xau"]
+
+
+def test_xau_is_left_out_of_row_premiums(tmp_path):
+    from goldtracker.collectors import RawListing, save_listings
+    from goldtracker.ranking import rank
+    conn = db.connect(tmp_path / "g.db")
+    db.init_db(conn)
+    db.save_rate(conn, 14248, "ibja", as_of="2026-10-23T12:00:00+05:30")
+    db.save_rate(conn, 12215.7, "xau", as_of="2026-10-23T21:23:44+05:30")
+    save_listings(conn, [RawListing("flipkart", "A", "MMTC 24K 999 Gold Coin 1 g", 15000)])
+    deals = rank(conn, [], rate_sources=["ibja", "tanishq", "goodreturns", "xau"])
+    assert deals and deals[0].benchmark == "ibja" and set(deals[0].premiums) == {"ibja"}

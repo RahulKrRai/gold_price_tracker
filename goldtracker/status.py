@@ -11,7 +11,8 @@ from .offers import load_offers
 from .rates import IST, rate_is_stale
 from .ranking import rank
 
-SOURCE_LABELS = {"ibja": "IBJA", "tanishq": "Tanishq", "manual": "Manual", "url": "Custom URL"}
+SOURCE_LABELS = {"ibja": "IBJA", "tanishq": "Tanishq", "goodreturns": "GoodReturns",
+                 "xau": "Intl spot (no duty)", "manual": "Manual", "url": "Custom URL"}
 
 
 def _label(source: str) -> str:
@@ -75,6 +76,43 @@ def _ago(d: timedelta) -> str:
     return f"{m} min" if m < 120 else f"{m // 60} h" if m < 48 * 60 else f"{m // 1440} days"
 
 
+RETAILER_LABELS = {"myntra": "Myntra", "ajio": "Ajio", "flipkart": "Flipkart", "amazon": "Amazon",
+                   "tatacliq": "Tata CLiQ", "coinbazaar": "CoinBazaar", "zepto": "Zepto"}
+
+
+def freshness(conn: sqlite3.Connection, settings: Settings) -> list[dict]:
+    """One row per rate source and retailer: when it last worked, and whether the last try failed.
+
+    The dashboard turns these into "Flipkart · 12 min ago" / "Myntra · failing" pills."""
+    runs = db.last_runs(conn)
+    seen = db.last_seen_by_retailer(conn)
+    rows: list[dict] = []
+    rate_run = runs.get("rates") or {}
+    latest = db.latest_rates(conn)
+    # refresh_rates_job stores errors as "ibja: HTTPError ...; tanishq: ..."
+    failed = {}
+    for part in (rate_run.get("last_error") or "").split("; "):
+        src, _, err = part.partition(": ")
+        if err:
+            failed[src.strip()] = err[:160]
+    for src in settings.rate_sources + sorted(s for s in latest if s not in settings.rate_sources):
+        r = latest.get(src)
+        if r is None and src not in failed:
+            continue
+        rows.append({"kind": "rate", "id": src, "label": _label(src),
+                     "as_of": (r["as_of"] or r["fetched_at"]) if r else None,
+                     "checked_at": rate_run.get("last_attempt"),
+                     "ok": src not in failed and r is not None, "error": failed.get(src)})
+    for name in sorted(set(seen) | {j for j in runs if j != "rates"}):
+        run = runs.get(name) or {}
+        rows.append({"kind": "retailer", "id": name, "label": RETAILER_LABELS.get(name, name.title()),
+                     "as_of": run.get("last_success") or seen.get(name),
+                     "checked_at": run.get("last_attempt"),
+                     "ok": bool(run.get("last_ok", True)),
+                     "error": (run.get("last_error") or "")[:160] or None})
+    return rows
+
+
 def build_meta(conn: sqlite3.Connection, settings: Settings, now: datetime | None = None) -> dict:
     # Filter options come from what can actually be ranked, so no chip leads to an empty table
     ranked = rank(conn, [], in_stock_only=False, rate_sources=settings.rate_sources)
@@ -88,6 +126,7 @@ def build_meta(conn: sqlite3.Connection, settings: Settings, now: datetime | Non
         "rates": rb["rates"], "benchmark": rb["benchmark"],
         "last_sync": max(seen.values()) if seen else None,
         "retailer_sync": seen,
+        "freshness": freshness(conn, settings),
         "warnings": warnings(conn, settings, now),
         "retailers": sorted({d.retailer for d in ranked}),
         "weights": sorted({d.weight_g for d in ranked}),

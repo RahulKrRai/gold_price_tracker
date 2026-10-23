@@ -28,8 +28,11 @@ COLLECTORS = {
     "flipkart": "goldtracker.collectors.flipkart",
     "amazon": "goldtracker.collectors.amazon",          # official Creators API
     "amazon_web": "goldtracker.collectors.amazon_web",  # browser fallback
+    "tatacliq": "goldtracker.collectors.tatacliq",
+    "coinbazaar": "goldtracker.collectors.coinbazaar",  # plain HTTP (JSON), no browser
+    "zepto": "goldtracker.collectors.zepto",
 }
-RETAILERS = ["myntra", "ajio", "flipkart", "amazon"]
+RETAILERS = ["myntra", "ajio", "flipkart", "amazon", "tatacliq", "coinbazaar", "zepto"]
 
 
 def enabled_retailers(settings: Settings) -> list[str]:

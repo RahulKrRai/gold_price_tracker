@@ -55,10 +55,12 @@ def why_empty(retailer: str) -> str:
 
 
 def browse(urls: Iterable[str], extract_js: str, *, pause: float = PAUSE_SECONDS, wait_ms: int = 3000,
-           headless: bool = True, scroll: bool = False, stop: Callable[[object], bool] | None = None) -> list:
+           headless: bool = True, scroll: bool = False, stop: Callable[[object], bool] | None = None,
+           before_extract: Callable[[object], None] | None = None) -> list:
     """Open each URL, run `extract_js` in the page and collect what it returns.
 
     stop(result) -> True ends the walk early (e.g. a page with no products = past the last page).
+    before_extract(page) runs after loading, e.g. to click "Show more" a few times.
     """
     try:
         from playwright.sync_api import sync_playwright
@@ -78,6 +80,11 @@ def browse(urls: Iterable[str], extract_js: str, *, pause: float = PAUSE_SECONDS
                 for _ in range(4):
                     page.mouse.wheel(0, 2500)
                     page.wait_for_timeout(800)
+            if before_extract:
+                try:
+                    before_extract(page)
+                except Exception:  # noqa: BLE001 - extract what loaded so far
+                    pass
             result = page.evaluate(extract_js)
             note_page(page, response, url, empty=not result)
             results.append(result)

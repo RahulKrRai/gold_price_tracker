@@ -38,7 +38,7 @@ class Settings:
     )
     refresh_minutes: int = field(default_factory=lambda: int(os.getenv("REFRESH_MINUTES", "45")))
     # First source is the benchmark for "vs market"; others are shown alongside
-    rate_sources: list[str] = field(default_factory=lambda: _list("GOLD_RATE_SOURCES", "ibja,tanishq"))
+    rate_sources: list[str] = field(default_factory=lambda: _list("GOLD_RATE_SOURCES", "ibja,tanishq,goodreturns,xau"))
     # Twice a day on weekdays, after IBJA's AM and PM sessions (IST, "HH:MM")
     rate_times: list[str] = field(default_factory=lambda: _list("RATE_REFRESH_TIMES", "11:00,17:00"))
     publish_dir: Path = field(default_factory=lambda: ROOT / os.getenv("PUBLISH_DIR", "site"))
@@ -55,7 +55,7 @@ class Settings:
         default_factory=lambda: os.getenv("AMAZON_API_BASE", "https://creatorsapi.amazon/catalog/v1/").strip())
     amazon_marketplace: str = field(default_factory=lambda: os.getenv("AMAZON_MARKETPLACE", "www.amazon.in").strip())
     # Which retailers to collect; Amazon uses the Creators API when keys are set, otherwise the browser
-    retailers: list[str] = field(default_factory=lambda: _list("RETAILERS", "myntra,ajio,flipkart,amazon"))
+    retailers: list[str] = field(default_factory=lambda: _list("RETAILERS", "myntra,ajio,flipkart,amazon,tatacliq,coinbazaar,zepto"))
     amazon_source: str = field(default_factory=lambda: os.getenv("AMAZON_SOURCE", "auto").strip().lower())
     amazon_keywords: list[str] = field(
         default_factory=lambda: _list("AMAZON_KEYWORDS", "24k gold coin,gold bar 999,22k gold coin"))
